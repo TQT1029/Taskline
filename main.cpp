@@ -1,3 +1,4 @@
+#include "mainwindow.h"
 #include "taskmanager.h"
 #include <QApplication>
 #include <QLocale>
@@ -57,9 +58,17 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
 
-    // Bỏ qua load Translator và giao diện tạm thời để test Core
-    runTests();
+    QTranslator translator;
+    const QStringList uiLanguages = QLocale::system().uiLanguages();
+    for (const QString &locale : uiLanguages) {
+        const QString baseName = "Taskline_" + QLocale(locale).name();
+        if (translator.load(":/i18n/" + baseName)) {
+            a.installTranslator(&translator);
+            break;
+        }
+    }
 
-    // Không gọi exec() để app dừng ngay sau khi test xong
-    return 0;
+    MainWindow w;
+    w.show();
+    return QApplication::exec();
 }
