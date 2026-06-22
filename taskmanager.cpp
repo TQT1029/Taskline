@@ -7,14 +7,14 @@
 
 TaskManager::TaskManager() : nextId(1) {}
 
-void TaskManager::addTask(const QString &title, TaskStatus status, int priority, const QDateTime &deadline) {
-    tasks.append(Task(nextId++, title, status, priority, deadline));
+void TaskManager::addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
+    tasks.append(Task(nextId++, title, description, status, priority, deadline));
 }
 
-bool TaskManager::editTask(int id, const QString &title, TaskStatus status, int priority, const QDateTime &deadline) {
+bool TaskManager::editTask(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
     for (auto &task : tasks) {
         if (task.getId() == id) {
-            task = Task(id, title, status, priority, deadline);
+            task = Task(id, title, description, status, priority, deadline);
             return true;
         }
     }
@@ -127,6 +127,7 @@ bool TaskManager::saveToFile(const QString &filePath) const {
         QJsonObject taskObj;
         taskObj["id"] = task.getId();
         taskObj["title"] = task.getTitle();
+        taskObj["description"] = task.getDescription();
         taskObj["status"] = Task::statusToString(task.getStatus());
         taskObj["priority"] = task.getPriority();
         taskObj["deadline"] = task.getDeadline().toString(Qt::ISODate);
@@ -175,11 +176,12 @@ bool TaskManager::loadFromFile(const QString &filePath) {
         QJsonObject taskObj = val.toObject();
         int id = taskObj["id"].toInt();
         QString title = taskObj["title"].toString();
+        QString description = taskObj["description"].toString();
         TaskStatus status = Task::stringToStatus(taskObj["status"].toString());
         int priority = taskObj["priority"].toInt();
         QDateTime deadline = QDateTime::fromString(taskObj["deadline"].toString(), Qt::ISODate);
         
-        tasks.append(Task(id, title, status, priority, deadline));
+        tasks.append(Task(id, title, description, status, priority, deadline));
     }
     
     return true;

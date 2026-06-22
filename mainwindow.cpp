@@ -1,6 +1,9 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 #include <QDateTime>
+#include <QDir>
+#include <QEvent>
+#include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
 
@@ -45,7 +48,7 @@ MainWindow::MainWindow(QWidget *parent)
         );
 
     // 3. Khởi tạo và định dạng nhãn chữ "Task"
-    titleLabel = new QLabel("Task", topBar);
+    titleLabel = new QLabel("Taskline", topBar);
     titleLabel->setStyleSheet(
         "color: white;"
         "font-size: 22px;"
@@ -118,13 +121,37 @@ MainWindow::MainWindow(QWidget *parent)
     scrollArea->setWidget(scrollContent);
 
     // 5. Thêm topBar (Cố định) và scrollArea (Cuộn được) vào layout chính của màn hình
-    mainLayout->addWidget(topBar, 1);      // Chiếm 20% hoặc tự động co theo nội dung topbar
-    mainLayout->addWidget(scrollArea, 7);  // Chiếm toàn bộ phần còn lại và có thể cuộn
+    mainLayout->addWidget(topBar, 0);      
+    mainLayout->addWidget(scrollArea, 1);
 
-    // ====================================================
-    // 💡 VÍ DỤ MINH HỌA: Thêm thử 20 cái nhãn để text dài ra xem nó cuộn
-    // ====================================================
+    // 6. Khởi tạo bottomBar chứa nút Undo
+    bottomBar = new QWidget(this);
+    bottomBar->setStyleSheet("background-color: #ecf0f1;");
+    bottomBarLayout = new QHBoxLayout(bottomBar);
+    bottomBarLayout->setContentsMargins(15, 10, 15, 10);
+    
+    undoButton = new QPushButton("⟲ Undo", bottomBar);
+    undoButton->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #f39c12; color: white; font-weight: bold; font-size: 14px;"
+        "   border-radius: 6px; padding: 6px 15px;"
+        "}"
+        "QPushButton:hover { background-color: #e67e22; }"
+    );
+    bottomBarLayout->addStretch();
+    bottomBarLayout->addWidget(undoButton);
+    
+    mainLayout->addWidget(bottomBar, 0);
+
+    // Tải dữ liệu từ TaskManager
+    dataFilePath = QDir::currentPath() + "/tasks.json";
+    taskManager.loadFromFile(dataFilePath);
+    
     connect(newButton, &QPushButton::clicked, this, &MainWindow::addNewTask);
+    connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
+
+    // Hiển thị danh sách task ban đầu
+    refreshTaskList();
 }
 
 MainWindow::~MainWindow()
@@ -134,55 +161,196 @@ MainWindow::~MainWindow()
 
 void MainWindow::addNewTask()
 {
-    // 1. Tạo một Widget tổng làm khung bọc cho cả 1 dòng Task
-    QWidget *taskItem = new QWidget(scrollContent);
-    taskItem->setStyleSheet(
-        "QWidget {"
-        "   background-color: white;"
-        "   border-radius: 8px;"
-        "   min-height: 70px;"
-        "}"
+    TaskDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        taskManager.addTask(
+            dialog.getTitle(),
+            dialog.getDescription(),
+            dialog.getStatus(),
+            dialog.getPriority(),
+            dialog.getDeadline()
         );
+        taskManager.saveToFile(dataFilePath);
+        refreshTaskList();
+    }
+}
 
-    taskItem->setFixedHeight(70);
+void MainWindow::refreshTaskList()
+{
+    // Xóa tất cả các widget con trong contentLayout
+    QLayoutItem *child;
+    while ((child = contentLayout->takeAt(0)) != nullptr) {
+        if (child->widget()) {
+            delete child->widget();
+        }
+        delete child;
+    }
 
-    // 2. Tạo Layout ngang cho taskItem (để chia trái: Chữ, phải: Ô check)
-    QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
-    taskLayout->setContentsMargins(15, 10, 15, 10);
-
-    // 3. Tạo một Widget phụ và Layout dọc bên trái để chứa Tên & Deadline xếp chồng lên nhau
-    QWidget *textContainer = new QWidget(taskItem);
-    QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
-    textLayout->setContentsMargins(0, 0, 0, 0);
-    textLayout->setSpacing(4); // Khoảng cách giữa tên và deadline
-
-    // Nhãn tên mặc định "Unidentified" ở góc trên trái
-    QLabel *nameLabel = new QLabel("Unidentified", textContainer);
-    nameLabel->setStyleSheet("color: #2c3e50; font-size: 15px; font-weight: bold; background: transparent;");
-
-    // Nhãn deadline ở dưới (lấy tạm thời gian hiện tại + 1 ngày làm mẫu)
-    QString currentDateTime = QDateTime::currentDateTime().addDays(1).toString("dd/MM/yyyy hh:mm");
-    QLabel *deadlineLabel = new QLabel("Deadline: " + currentDateTime, textContainer);
-    deadlineLabel->setStyleSheet("color: #7f8c8d; font-size: 12px; background: transparent;");
-
-    // Thêm tên và deadline vào layout dọc bên trái
-    textLayout->addWidget(nameLabel);
-    textLayout->addWidget(deadlineLabel);
-
-    // 4. Tạo ô check (QCheckBox) nằm ở bên phải
-    QCheckBox *checkBox = new QCheckBox(taskItem);
-    checkBox->setStyleSheet(
-        "QCheckBox::indicator {"
-        "   width: 20px;"
-        "   height: 20px;"
-        "}"
+    QList<Task> tasks = taskManager.getAllTasks();
+    for (const Task &task : tasks) {
+        QWidget *taskItem = new QWidget(scrollContent);
+        taskItem->setObjectName("taskItem");
+        taskItem->setStyleSheet(
+            "QWidget#taskItem {"
+            "   background-color: white;"
+            "   border-radius: 10px;"
+            "   border: 1px solid #dcdde1;"
+            "   min-height: 75px;"
+            "}"
+            "QWidget#taskItem:hover {"
+            "   border: 1px solid #3498db;"
+            "   background-color: #f8fbfc;"
+            "}"
         );
+        taskItem->setFixedHeight(75);
 
-    // 5. Lắp ráp các thành phần vào Layout ngang của Task
-    taskLayout->addWidget(textContainer); // Bên trái chứa cụm text
-    taskLayout->addStretch();             // Khoảng trống ở giữa đẩy checkbox sang phải
-    taskLayout->addWidget(checkBox);      // Bên phải chứa checkbox
+        QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
+        taskLayout->setContentsMargins(15, 10, 15, 10);
 
-    // 6. Đưa toàn bộ viên Task vừa tạo vào danh sách cuộn chính
-    contentLayout->addWidget(taskItem);
+        QWidget *textContainer = new QWidget(taskItem);
+        QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
+        textLayout->setContentsMargins(0, 0, 0, 0);
+        textLayout->setSpacing(4);
+
+        QLabel *nameLabel = new QLabel(task.getTitle(), textContainer);
+        QString textStyle = "color: #2c3e50; font-size: 15px; font-weight: bold; background: transparent;";
+        if (task.getStatus() == TaskStatus::DONE) {
+            textStyle += " text-decoration: line-through; color: #95a5a6;";
+        }
+        nameLabel->setStyleSheet(textStyle);
+
+        QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
+        QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
+        
+        QString deadlineStyle = "font-size: 12px; background: transparent;";
+        if (task.isOverdue()) {
+            deadlineStyle += " color: #e74c3c; font-weight: bold;";
+        } else {
+            deadlineStyle += " color: #7f8c8d;";
+        }
+        deadlineLabel->setStyleSheet(deadlineStyle);
+
+        textLayout->addWidget(nameLabel);
+        textLayout->addWidget(deadlineLabel);
+
+        QCheckBox *checkBox = new QCheckBox(taskItem);
+        checkBox->setStyleSheet(
+            "QCheckBox::indicator {"
+            "   width: 20px;"
+            "   height: 20px;"
+            "}"
+        );
+        checkBox->setChecked(task.getStatus() == TaskStatus::DONE);
+        checkBox->setProperty("taskId", task.getId());
+        
+        connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
+
+        QToolButton *deleteBtn = new QToolButton(taskItem);
+        deleteBtn->setText("🗑");
+        deleteBtn->setStyleSheet(
+            "QToolButton {"
+            "   color: #e74c3c; font-size: 18px; background: transparent; border: none;"
+            "}"
+            "QToolButton:hover {"
+            "   color: #c0392b; font-size: 20px;"
+            "}"
+        );
+        deleteBtn->setProperty("taskId", task.getId());
+        connect(deleteBtn, &QToolButton::clicked, this, &MainWindow::onDeleteTaskClicked);
+
+        taskLayout->addWidget(textContainer);
+        taskLayout->addStretch();
+        taskLayout->addWidget(deleteBtn);
+        taskLayout->addWidget(checkBox);
+
+        // Bắt sự kiện click vào task để mở Details
+        taskItem->setProperty("taskId", task.getId());
+        taskItem->setCursor(Qt::PointingHandCursor);
+        taskItem->installEventFilter(this);
+
+        contentLayout->addWidget(taskItem);
+    }
+}
+
+void MainWindow::onTaskStatusChanged(int state)
+{
+    QCheckBox *senderCb = qobject_cast<QCheckBox*>(sender());
+    if (senderCb) {
+        int taskId = senderCb->property("taskId").toInt();
+        QList<Task> allTasks = taskManager.getAllTasks();
+        Task targetTask = allTasks.first(); // Fallback
+        
+        for (const Task &t : allTasks) {
+            if (t.getId() == taskId) {
+                targetTask = t;
+                break;
+            }
+        }
+        
+        if (state == Qt::Checked) {
+            taskManager.markTaskDone(taskId);
+        } else {
+            taskManager.editTask(taskId, targetTask.getTitle(), targetTask.getDescription(), TaskStatus::TODO, targetTask.getPriority(), targetTask.getDeadline());
+        }
+        taskManager.saveToFile(dataFilePath);
+        refreshTaskList();
+    }
+}
+
+void MainWindow::onDeleteTaskClicked()
+{
+    QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
+    if (senderBtn) {
+        int taskId = senderBtn->property("taskId").toInt();
+        taskManager.deleteTask(taskId);
+        taskManager.saveToFile(dataFilePath);
+        refreshTaskList();
+    }
+}
+
+void MainWindow::onUndoTaskClicked()
+{
+    taskManager.undoDelete();
+    taskManager.saveToFile(dataFilePath);
+    refreshTaskList();
+}
+
+void MainWindow::openTaskDetails()
+{
+    QWidget *senderWidget = qobject_cast<QWidget*>(sender());
+    // Mặc dù eventFilter xử lý, nhưng để gọi được slot cần gán tín hiệu hoặc gọi trực tiếp từ filter.
+}
+
+// Bổ sung hàm eventFilter cho MainWindow (cần khai báo override trong .h)
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonRelease) {
+        QWidget *widget = qobject_cast<QWidget*>(watched);
+        if (widget && widget->property("taskId").isValid()) {
+            int taskId = widget->property("taskId").toInt();
+            
+            QList<Task> allTasks = taskManager.getAllTasks();
+            for (const Task &t : allTasks) {
+                if (t.getId() == taskId) {
+                    TaskDialog dialog(this);
+                    dialog.setTaskData(t);
+                    if (dialog.exec() == QDialog::Accepted) {
+                        taskManager.editTask(
+                            taskId,
+                            dialog.getTitle(),
+                            dialog.getDescription(),
+                            dialog.getStatus(),
+                            dialog.getPriority(),
+                            dialog.getDeadline()
+                        );
+                        taskManager.saveToFile(dataFilePath);
+                        refreshTaskList();
+                    }
+                    break;
+                }
+            }
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }

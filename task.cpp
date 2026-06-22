@@ -1,8 +1,8 @@
 #include "task.h"
 
 // Sử dụng Member Initializer List để khởi tạo giá trị cho các biến
-Task::Task(int id, const QString &title, TaskStatus status, int priority, const QDateTime &deadline)
-    : id(id), title(title), status(status), priority(priority), deadline(deadline) {}
+Task::Task(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline)
+    : id(id), title(title), description(description), status(status), priority(priority), deadline(deadline) {}
 
 int Task::getId() const {
     return id;
@@ -10,6 +10,10 @@ int Task::getId() const {
 
 QString Task::getTitle() const {
     return title;
+}
+
+QString Task::getDescription() const {
+    return description;
 }
 
 TaskStatus Task::getStatus() const {
@@ -22,6 +26,14 @@ int Task::getPriority() const {
 
 QDateTime Task::getDeadline() const {
     return deadline;
+}
+
+void Task::setTitle(QString newTitle) {
+    title = newTitle;
+}
+
+void Task::setDescription(QString newDescription) {
+    description = newDescription;
 }
 
 void Task::setStatus(TaskStatus newStatus) {

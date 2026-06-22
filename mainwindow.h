@@ -10,6 +10,7 @@
 #include <QToolButton>
 #include <QScrollArea>
 #include <QCheckBox>
+#include "taskmanager.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -23,9 +24,17 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     void addNewTask();
+    void refreshTaskList();
+    void onTaskStatusChanged(int state);
+    void openTaskDetails();
+    void onDeleteTaskClicked();
+    void onUndoTaskClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -42,6 +51,13 @@ private:
     QHBoxLayout *topBarLayout;
     QToolButton *menuButton;
     QPushButton *newButton;
+    
+    QWidget *bottomBar;
+    QHBoxLayout *bottomBarLayout;
+    QPushButton *undoButton;
+
+    TaskManager taskManager;
+    QString dataFilePath;
 };
 
 #endif // MAINWINDOW_H

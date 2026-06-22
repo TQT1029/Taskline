@@ -15,6 +15,7 @@ class Task
 private:
     int id;
     QString title;
+    QString description;
     TaskStatus status;
     int priority;   // Độ ưu tiên
     QDateTime deadline;
@@ -23,6 +24,7 @@ public:
     // Constructor
     Task(int id,
          const QString &title,
+         const QString &description,
          TaskStatus status,
          int priority,
          const QDateTime &deadline);
@@ -30,11 +32,14 @@ public:
     // Các hàm Getters
     int getId() const;
     QString getTitle() const;
+    QString getDescription() const;
     TaskStatus getStatus() const;
     int getPriority() const;
     QDateTime getDeadline() const;
 
     // Các hàm Setters / Logic khác
+    void setTitle(QString title);
+    void setDescription(QString description);
     void setStatus(TaskStatus newStatus);
     bool isOverdue() const; // Kiểm tra task quá hạn
 

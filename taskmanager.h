@@ -17,8 +17,8 @@ public:
     TaskManager();
 
     // Thêm, sửa, xóa
-    void addTask(const QString &title, TaskStatus status, int priority, const QDateTime &deadline);
-    bool editTask(int id, const QString &title, TaskStatus status, int priority, const QDateTime &deadline);
+    void addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline);
+    bool editTask(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline);
     bool deleteTask(int id);
     bool markTaskDone(int id);
     
