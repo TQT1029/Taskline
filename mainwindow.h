@@ -35,7 +35,6 @@ private slots:
     void openTaskDetails();
     void onDeleteTaskClicked();
     void onUndoTaskClicked();
-    void onMenuButtonClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -59,10 +58,6 @@ private:
 
     TaskManager taskManager;
     QString dataFilePath;
-
-    int currentStatusFilter = 0;   // 0: Tất cả, 1: Chưa làm, 2: Đang làm, 3: Hoàn thành
-    int currentPriorityFilter = 0; // 0: Tất cả, giá trị số nhập vào sẽ lọc chính xác (Ví dụ: 1, 2, 3...)
-    int currentSortOrder = 0;      // 0: Mặc định, 1: Sắp tới trước, 2: Xa nhất trước
 };
 
 #endif // MAINWINDOW_H
