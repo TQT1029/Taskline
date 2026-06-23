@@ -284,6 +284,24 @@ void MainWindow::refreshTaskList()
         
         connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
 
+        QWidget *statusColorWidget = new QWidget(taskItem);
+
+        // Xác định màu sắc dựa trên trạng thái của Task
+        QString statusColor = "#95a5a6"; // Mặc định (Xám)
+        if (task.getStatus() == TaskStatus::TODO) {
+            statusColor = "#e74c3c";     // Chưa làm: Đỏ nhạt
+        } else if (task.getStatus() == TaskStatus::IN_PROGRESS) {
+            statusColor = "#f1c40f";     // Đang làm: Vàng
+        } else if (task.getStatus() == TaskStatus::DONE) {
+            statusColor = "#2ecc71";     // Hoàn thành: Xanh lá
+        }
+
+        // Định dạng Widget thành một hình tròn nhỏ (hoặc hình chữ nhật bo góc)
+        statusColorWidget->setStyleSheet(
+            QString("background-color: %1; border-radius: 6px;").arg(statusColor)
+            );
+        statusColorWidget->setFixedSize(12, 12);
+
         QToolButton *deleteBtn = new QToolButton(taskItem);
         deleteBtn->setText("🗑");
         deleteBtn->setStyleSheet(
@@ -299,6 +317,7 @@ void MainWindow::refreshTaskList()
 
         taskLayout->addWidget(textContainer);
         taskLayout->addStretch();
+        taskLayout->addWidget(statusColorWidget);
         taskLayout->addWidget(deleteBtn);
         taskLayout->addWidget(checkBox);
 
