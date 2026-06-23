@@ -1,8 +1,10 @@
 #include "mainwindow.h"
+#include "filterdialog.h"
 #include "./ui_mainwindow.h"
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
+#include <algorithm>
 #include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -149,6 +151,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     connect(newButton, &QPushButton::clicked, this, &MainWindow::addNewTask);
     connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
+    connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
 
     // Hiển thị danh sách task ban đầu
     refreshTaskList();
@@ -186,8 +189,44 @@ void MainWindow::refreshTaskList()
         delete child;
     }
 
-    QList<Task> tasks = taskManager.getAllTasks();
-    for (const Task &task : tasks) {
+    QList<Task> displayTasks;
+
+    // 1. Áp dụng các bộ lọc của TaskManager để lấy danh sách phù hợp ban đầu
+    if (currentStatusFilter == 1) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::TODO);
+    } else if (currentStatusFilter == 2) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::IN_PROGRESS);
+    } else if (currentStatusFilter == 3) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::DONE);
+    } else {
+        displayTasks = taskManager.getAllTasks();
+    }
+
+    // 2. Tiếp tục lọc thủ công theo Độ ưu tiên (Nếu người dùng chọn khác 0)
+    if (currentPriorityFilter != 0) {
+        QList<Task> tempTasks;
+        for (const Task &task : displayTasks) {
+            if (task.getPriority() == currentPriorityFilter) {
+                tempTasks.append(task);
+            }
+        }
+        displayTasks = tempTasks;
+    }
+
+    // 3. Thực hiện Sắp xếp (Sorting) theo Deadline bằng std::sort
+    if (currentSortOrder == 1) {
+        // Deadline sắp tới trước (Tăng dần)
+        std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
+            return a.getDeadline() < b.getDeadline();
+        });
+    } else if (currentSortOrder == 2) {
+        // Deadline xa nhất trước (Giảm dần)
+        std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
+            return a.getDeadline() > b.getDeadline();
+        });
+    }
+
+    for (const Task &task : displayTasks) {
         QWidget *taskItem = new QWidget(scrollContent);
         taskItem->setObjectName("taskItem");
         taskItem->setStyleSheet(
@@ -353,4 +392,19 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         }
     }
     return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::onMenuButtonClicked()
+{
+    // Truyền các giá trị lọc hiện tại vào để hiển thị lại trên dialog
+    FilterDialog dialog(currentStatusFilter, currentPriorityFilter, currentSortOrder, this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        currentStatusFilter = dialog.getSelectedStatus();
+        currentPriorityFilter = dialog.getSelectedPriority();
+        currentSortOrder = dialog.getSortOrder();
+
+        // Làm mới lại danh sách hiển thị với bộ lọc mới
+        refreshTaskList();
+    }
 }
