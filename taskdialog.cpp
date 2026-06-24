@@ -9,20 +9,42 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
 
     // Style
     setStyleSheet(
-        "QDialog { background-color: #f7f9fa; }"
-        "QLabel { font-weight: bold; color: #2c3e50; }"
         "QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateTimeEdit {"
         "   border: 1px solid #bdc3c7; border-radius: 4px; padding: 5px; background: white;"
         "}"
+
+        // TÙY CHỈNH NÚT TĂNG GIẢM CỦA SPINBOX ĐỂ GIỐNG DIALOG BỘ LỌC
+        "QSpinBox::up-button {"
+        "    subcontrol-origin: border;"
+        "    subcontrol-position: top right;"
+        "    width: 25px;"
+        "    border-top-right-radius: 4px;"
+        "    border-left: 1px solid #bdc3c7;"
+        "    border-bottom: 1px solid #bdc3c7;"
+        "    background: #f1f5f9;"
+        "}"
+        "QSpinBox::up-button:hover { background: #e2e8f0; }"
+        "QSpinBox::up-button:disabled { background: #ecf0f1; border-left: none; }"
+
+        "QSpinBox::down-button {"
+        "    subcontrol-origin: border;"
+        "    subcontrol-position: bottom right;"
+        "    width: 25px;"
+        "    border-bottom-right-radius: 4px;"
+        "    border-left: 1px solid #bdc3c7;"
+        "    background: #f1f5f9;"
+        "}"
+        "QSpinBox::down-button:hover { background: #e2e8f0; }"
+        "QSpinBox::down-button:disabled { background: #ecf0f1; border-left: none; }"
+
+        // Giữ khoảng cách chữ không bị đè lên nút
+        "QSpinBox {"
+        "    padding-right: 30px;"
+        "}"
+
         "QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDateTimeEdit:disabled {"
         "   background: #ecf0f1; color: #7f8c8d;"
         "}"
-        "QPushButton { background-color: #3498db; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #2980b9; }"
-        "QPushButton#btnCancel { background-color: #e74c3c; }"
-        "QPushButton#btnCancel:hover { background-color: #c0392b; }"
-        "QPushButton#btnLockToggle { background-color: #f39c12; }"
-        "QPushButton#btnLockToggle:hover { background-color: #d68910; }"
     );
 
     // Khởi tạo controls
@@ -99,11 +121,20 @@ void TaskDialog::setTaskData(const Task &task)
 void TaskDialog::setEditMode(bool editable)
 {
     m_editable = editable;
+
     titleInput->setEnabled(editable);
-    descInput->setEnabled(editable);
     statusInput->setEnabled(editable);
     priorityInput->setEnabled(editable);
     deadlineInput->setEnabled(editable);
+
+    descInput->setEnabled(true);
+    descInput->setReadOnly(!editable);
+
+    if (editable) {
+        descInput->setStyleSheet("background-color: white; color: black;");
+    } else {
+        descInput->setStyleSheet("background-color: #f5f5f5; color: #7f8c8d;");
+    }
 
     if (editable) {
         btnLockToggle->setText("🔓 Khóa (Lock)");

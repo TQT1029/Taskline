@@ -1,8 +1,10 @@
 #include "mainwindow.h"
+#include "filterdialog.h"
 #include "./ui_mainwindow.h"
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
+#include <algorithm>
 #include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -149,6 +151,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     connect(newButton, &QPushButton::clicked, this, &MainWindow::addNewTask);
     connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
+    connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
 
     // Hiển thị danh sách task ban đầu
     refreshTaskList();
@@ -186,8 +189,44 @@ void MainWindow::refreshTaskList()
         delete child;
     }
 
-    QList<Task> tasks = taskManager.getAllTasks();
-    for (const Task &task : tasks) {
+    QList<Task> displayTasks;
+
+    // 1. Áp dụng các bộ lọc của TaskManager để lấy danh sách phù hợp ban đầu
+    if (currentStatusFilter == 1) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::TODO);
+    } else if (currentStatusFilter == 2) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::IN_PROGRESS);
+    } else if (currentStatusFilter == 3) {
+        displayTasks = taskManager.filterByStatus(TaskStatus::DONE);
+    } else {
+        displayTasks = taskManager.getAllTasks();
+    }
+
+    // 2. Tiếp tục lọc thủ công theo Độ ưu tiên (Nếu người dùng chọn khác 0)
+    if (currentPriorityFilter != 0) {
+        QList<Task> tempTasks;
+        for (const Task &task : displayTasks) {
+            if (task.getPriority() == currentPriorityFilter) {
+                tempTasks.append(task);
+            }
+        }
+        displayTasks = tempTasks;
+    }
+
+    // 3. Thực hiện Sắp xếp (Sorting) theo Deadline bằng std::sort
+    if (currentSortOrder == 1) {
+        // Deadline sắp tới trước (Tăng dần)
+        std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
+            return a.getDeadline() < b.getDeadline();
+        });
+    } else if (currentSortOrder == 2) {
+        // Deadline xa nhất trước (Giảm dần)
+        std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
+            return a.getDeadline() > b.getDeadline();
+        });
+    }
+
+    for (const Task &task : displayTasks) {
         QWidget *taskItem = new QWidget(scrollContent);
         taskItem->setObjectName("taskItem");
         taskItem->setStyleSheet(
@@ -195,14 +234,14 @@ void MainWindow::refreshTaskList()
             "   background-color: white;"
             "   border-radius: 10px;"
             "   border: 1px solid #dcdde1;"
-            "   min-height: 75px;"
+            "   min-height: 70px;"
             "}"
             "QWidget#taskItem:hover {"
             "   border: 1px solid #3498db;"
             "   background-color: #f8fbfc;"
             "}"
         );
-        taskItem->setFixedHeight(75);
+        taskItem->setFixedHeight(160);
 
         QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
         taskLayout->setContentsMargins(15, 10, 15, 10);
@@ -210,19 +249,46 @@ void MainWindow::refreshTaskList()
         QWidget *textContainer = new QWidget(taskItem);
         QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
         textLayout->setContentsMargins(0, 0, 0, 0);
-        textLayout->setSpacing(4);
+        textLayout->setSpacing(5);
 
         QLabel *nameLabel = new QLabel(task.getTitle(), textContainer);
-        QString textStyle = "color: #2c3e50; font-size: 15px; font-weight: bold; background: transparent;";
+        QString textStyle = "color: #2c3e50; font-size: 18px; font-weight: bold; background: transparent;";
         if (task.getStatus() == TaskStatus::DONE) {
             textStyle += " text-decoration: line-through; color: #95a5a6;";
         }
         nameLabel->setStyleSheet(textStyle);
 
+        // ⭐ 2. DÒNG MÔ TẢ: Thay đổi từ setFixedHeight sang setMaximumHeight để tự co lại khi text ngắn
+        QLabel *descriptionLabel = new QLabel(textContainer);
+        descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent;");
+        descriptionLabel->setWordWrap(true);       // Cho phép tự động xuống dòng khi chạm lề
+
+        // Dùng tối đa (Maximum) thay vì cố định (Fixed) giúp triệt tiêu khoảng trống thừa khi mô tả ngắn
+        descriptionLabel->setMaximumHeight(65);
+        descriptionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+
+        QString rawDesc = task.getDescription().trimmed();
+        if (rawDesc.isEmpty()) {
+            descriptionLabel->setText("(Không có mô tả)");
+        } else {
+            // Giới hạn số lượng ký tự để đảm bảo text tối đa 3 dòng và luôn xuất hiện dấu "..."
+            int maxChars = 115;
+            if (rawDesc.length() > maxChars) {
+                QString shortDesc = rawDesc.left(maxChars).trimmed() + "...";
+                descriptionLabel->setText(shortDesc);
+            } else {
+                descriptionLabel->setText(rawDesc);
+            }
+        }
+
+        // 3. Dòng Mức độ ưu tiên (Mới thêm)
+        QLabel *priorityLabel = new QLabel("Độ ưu tiên: " + QString::number(task.getPriority()), textContainer);
+        priorityLabel->setStyleSheet("font-size: 13px; color: #2f3542; font-weight: 500; background: transparent;");
+
         QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
         QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
         
-        QString deadlineStyle = "font-size: 12px; background: transparent;";
+        QString deadlineStyle = "font-size: 13px; background: transparent;";
         if (task.isOverdue()) {
             deadlineStyle += " color: #e74c3c; font-weight: bold;";
         } else {
@@ -231,6 +297,8 @@ void MainWindow::refreshTaskList()
         deadlineLabel->setStyleSheet(deadlineStyle);
 
         textLayout->addWidget(nameLabel);
+        textLayout->addWidget(descriptionLabel);
+        textLayout->addWidget(priorityLabel);
         textLayout->addWidget(deadlineLabel);
 
         QCheckBox *checkBox = new QCheckBox(taskItem);
@@ -245,6 +313,24 @@ void MainWindow::refreshTaskList()
         
         connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
 
+        QWidget *statusColorWidget = new QWidget(taskItem);
+
+        // Xác định màu sắc dựa trên trạng thái của Task
+        QString statusColor = "#95a5a6"; // Mặc định (Xám)
+        if (task.getStatus() == TaskStatus::TODO) {
+            statusColor = "#e74c3c";     // Chưa làm: Đỏ nhạt
+        } else if (task.getStatus() == TaskStatus::IN_PROGRESS) {
+            statusColor = "#f1c40f";     // Đang làm: Vàng
+        } else if (task.getStatus() == TaskStatus::DONE) {
+            statusColor = "#2ecc71";     // Hoàn thành: Xanh lá
+        }
+
+        // Định dạng Widget thành một hình tròn nhỏ (hoặc hình chữ nhật bo góc)
+        statusColorWidget->setStyleSheet(
+            QString("background-color: %1; border-radius: 6px;").arg(statusColor)
+            );
+        statusColorWidget->setFixedSize(12, 12);
+
         QToolButton *deleteBtn = new QToolButton(taskItem);
         deleteBtn->setText("🗑");
         deleteBtn->setStyleSheet(
@@ -258,8 +344,9 @@ void MainWindow::refreshTaskList()
         deleteBtn->setProperty("taskId", task.getId());
         connect(deleteBtn, &QToolButton::clicked, this, &MainWindow::onDeleteTaskClicked);
 
-        taskLayout->addWidget(textContainer);
+        taskLayout->addWidget(textContainer, 1);
         taskLayout->addStretch();
+        taskLayout->addWidget(statusColorWidget);
         taskLayout->addWidget(deleteBtn);
         taskLayout->addWidget(checkBox);
 
@@ -353,4 +440,19 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         }
     }
     return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::onMenuButtonClicked()
+{
+    // Truyền các giá trị lọc hiện tại vào để hiển thị lại trên dialog
+    FilterDialog dialog(currentStatusFilter, currentPriorityFilter, currentSortOrder, this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        currentStatusFilter = dialog.getSelectedStatus();
+        currentPriorityFilter = dialog.getSelectedPriority();
+        currentSortOrder = dialog.getSortOrder();
+
+        // Làm mới lại danh sách hiển thị với bộ lọc mới
+        refreshTaskList();
+    }
 }
