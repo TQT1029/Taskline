@@ -121,11 +121,20 @@ void TaskDialog::setTaskData(const Task &task)
 void TaskDialog::setEditMode(bool editable)
 {
     m_editable = editable;
+
     titleInput->setEnabled(editable);
-    descInput->setEnabled(editable);
     statusInput->setEnabled(editable);
     priorityInput->setEnabled(editable);
     deadlineInput->setEnabled(editable);
+
+    descInput->setEnabled(true);
+    descInput->setReadOnly(!editable);
+
+    if (editable) {
+        descInput->setStyleSheet("background-color: white; color: black;");
+    } else {
+        descInput->setStyleSheet("background-color: #f5f5f5; color: #7f8c8d;");
+    }
 
     if (editable) {
         btnLockToggle->setText("🔓 Khóa (Lock)");
