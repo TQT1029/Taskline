@@ -3,15 +3,17 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
+#include <QUuid>
 #include <algorithm>
 
-TaskManager::TaskManager() : nextId(1) {}
+TaskManager::TaskManager() {}
 
 void TaskManager::addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
-    tasks.append(Task(nextId++, title, description, status, priority, deadline));
+    QString id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    tasks.append(Task(id, title, description, status, priority, deadline));
 }
 
-bool TaskManager::editTask(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
+bool TaskManager::editTask(QString id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
     for (auto &task : tasks) {
         if (task.getId() == id) {
             task = Task(id, title, description, status, priority, deadline);
@@ -21,7 +23,7 @@ bool TaskManager::editTask(int id, const QString &title, const QString &descript
     return false;
 }
 
-bool TaskManager::deleteTask(int id) {
+bool TaskManager::deleteTask(QString id) {
     for (int i = 0; i < tasks.size(); ++i) {
         if (tasks[i].getId() == id) {
             undoStack.push(tasks[i]);
@@ -32,7 +34,7 @@ bool TaskManager::deleteTask(int id) {
     return false;
 }
 
-bool TaskManager::markTaskDone(int id) {
+bool TaskManager::markTaskDone(QString id) {
     for (auto &task : tasks) {
         if (task.getId() == id) {
             task.setStatus(TaskStatus::DONE);
@@ -135,7 +137,6 @@ bool TaskManager::saveToFile(const QString &filePath) const {
     }
     
     QJsonObject rootObj;
-    rootObj["nextId"] = nextId;
     rootObj["tasks"] = jsonArray;
 
     QJsonDocument doc(rootObj);
@@ -166,7 +167,6 @@ bool TaskManager::loadFromFile(const QString &filePath) {
     if (!doc.isObject()) return false;
     
     QJsonObject rootObj = doc.object();
-    nextId = rootObj["nextId"].toInt(1);
     
     QJsonArray jsonArray = rootObj["tasks"].toArray();
     tasks.clear();
@@ -174,7 +174,14 @@ bool TaskManager::loadFromFile(const QString &filePath) {
     
     for (const auto &val : jsonArray) {
         QJsonObject taskObj = val.toObject();
-        int id = taskObj["id"].toInt();
+        
+        QString id;
+        if (taskObj["id"].isString()) {
+            id = taskObj["id"].toString();
+        } else if (taskObj["id"].isDouble()) {
+            id = QString::number(taskObj["id"].toInt());
+        }
+
         QString title = taskObj["title"].toString();
         QString description = taskObj["description"].toString();
         TaskStatus status = Task::stringToStatus(taskObj["status"].toString());

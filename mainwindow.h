@@ -36,11 +36,10 @@ private:
     QList<Task> getFilteredAndSortedTasks();
     void renderTaskItem(const Task &task);
     
-    // UI Helpers cho renderTaskItem
     QWidget* createTextContainer(const Task &task, QWidget *parent);
-    QTextEdit* createDescriptionLabel(const QString &desc, QWidget *parent);
+    QLabel* createDescriptionLabel(const QString &desc, QWidget *parent);
     QWidget* createStatusBadge(TaskStatus status, QWidget *parent);
-    QToolButton* createDeleteButton(int taskId, QWidget *parent);
+    QToolButton* createDeleteButton(QString taskId, QWidget *parent);
     QCheckBox* createStatusCheckBox(const Task &task, QWidget *parent);
 
 private slots:

@@ -11,16 +11,15 @@ class TaskManager
 private:
     QList<Task> tasks;
     QStack<Task> undoStack;
-    int nextId;
 
 public:
     TaskManager();
 
     // Thêm, sửa, xóa
     void addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline);
-    bool editTask(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline);
-    bool deleteTask(int id);
-    bool markTaskDone(int id);
+    bool editTask(QString id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline);
+    bool deleteTask(QString id);
+    bool markTaskDone(QString id);
     
     // Undo
     void undoDelete();

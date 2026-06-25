@@ -1,6 +1,7 @@
 #include "taskdialog.h"
 #include <QFormLayout>
 #include <QMessageBox>
+#include "ThemeUtils.h"
 
 TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
 {
@@ -8,44 +9,68 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
     setMinimumWidth(400);
 
     // Style
-    setStyleSheet(
+    setStyleSheet(QString(
+        "QDialog { background-color: %1; }"
+        "QLabel { color: %2; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }"
         "QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateTimeEdit {"
-        "   border: 1px solid #bdc3c7; border-radius: 4px; padding: 5px; background: white; color: #2c3e50;"
-        "}"
-
+        "   border: 1px solid %3; border-radius: 4px; padding: 5px; background: %4; color: %5;"
+        "}")
+        .arg(ThemeUtils::dialogBg(), ThemeUtils::textMain(), ThemeUtils::inputBorder(), ThemeUtils::inputBg(), ThemeUtils::textMain())
+        + QString(
         // TÙY CHỈNH NÚT TĂNG GIẢM CỦA SPINBOX ĐỂ GIỐNG DIALOG BỘ LỌC
         "QSpinBox::up-button {"
         "    subcontrol-origin: border;"
         "    subcontrol-position: top right;"
         "    width: 25px;"
-        "    border-top-right-radius: 4px;"
-        "    border-left: 1px solid #bdc3c7;"
-        "    border-bottom: 1px solid #bdc3c7;"
-        "    background: #f1f5f9;"
+        "   border-top-right-radius: 4px;"
+        "   border-left: 1px solid %1;"
+        "   border-bottom: 1px solid %1;"
+        "   background: %2;"
         "}"
-        "QSpinBox::up-button:hover { background: #e2e8f0; }"
-        "QSpinBox::up-button:disabled { background: #ecf0f1; border-left: none; }"
+        "QSpinBox::up-button:hover { background: %3; }"
+        "QSpinBox::up-button:disabled { background: %4; border-left: none; }"
 
         "QSpinBox::down-button {"
         "    subcontrol-origin: border;"
         "    subcontrol-position: bottom right;"
-        "    width: 25px;"
-        "    border-bottom-right-radius: 4px;"
-        "    border-left: 1px solid #bdc3c7;"
-        "    background: #f1f5f9;"
+        "   width: 25px;"
+        "   border-bottom-right-radius: 4px;"
+        "   border-left: 1px solid %1;"
+        "   background: %2;"
         "}"
-        "QSpinBox::down-button:hover { background: #e2e8f0; }"
-        "QSpinBox::down-button:disabled { background: #ecf0f1; border-left: none; }"
-
+        "QSpinBox::down-button:hover { background: %3; }"
+        "QSpinBox::down-button:disabled { background: %4; border-left: none; }"
+        ).arg(ThemeUtils::inputBorder(), ThemeUtils::spinBtnBg(), ThemeUtils::spinBtnHover(), ThemeUtils::inputDisabledBg())
+        + QString(
         // Giữ khoảng cách chữ không bị đè lên nút
         "QSpinBox {"
         "    padding-right: 30px;"
         "}"
 
         "QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDateTimeEdit:disabled {"
-        "   background: #ecf0f1; color: #7f8c8d;"
+        "   background: %1; color: %2;"
         "}"
-    );
+
+        "QComboBox QAbstractItemView {"
+        "   background-color: %3;"
+        "   color: %4;"
+        "   selection-background-color: %5;"
+        "}"
+
+        "QPushButton#btnLockToggle, QPushButton#btnCancel {"
+        "   background-color: %6; color: %7; font-weight: bold; border-radius: 6px; padding: 6px 15px; border: none;"
+        "}"
+        "QPushButton#btnLockToggle:hover, QPushButton#btnCancel:hover { background-color: %8; }"
+        "QPushButton {"
+        "   background-color: %9; color: %10; font-weight: bold; border-radius: 6px; padding: 6px 15px; border: none;"
+        "}"
+        "QPushButton:hover { background-color: %11; }"
+    ).arg(
+        ThemeUtils::inputDisabledBg(), ThemeUtils::inputDisabledText(),
+        ThemeUtils::comboDropBg(), ThemeUtils::textMain(), ThemeUtils::btnPrimary(),
+        ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::btnSecondaryHover(),
+        ThemeUtils::btnPrimary(), ThemeUtils::btnPrimaryText(), ThemeUtils::btnPrimaryHover()
+    ));
 
     // Khởi tạo controls
     titleInput = new QLineEdit(this);
@@ -131,9 +156,9 @@ void TaskDialog::setEditMode(bool editable)
     descInput->setReadOnly(!editable);
 
     if (editable) {
-        descInput->setStyleSheet("background-color: white; color: #2c3e50;");
+        descInput->setStyleSheet(QString("background-color: %1; color: %2; border: 1px solid %3;").arg(ThemeUtils::inputBg(), ThemeUtils::textMain(), ThemeUtils::inputBorder()));
     } else {
-        descInput->setStyleSheet("background-color: #f5f5f5; color: #7f8c8d;");
+        descInput->setStyleSheet(QString("background-color: %1; color: %2; border: 1px solid %3;").arg(ThemeUtils::inputDisabledBg(), ThemeUtils::inputDisabledText(), ThemeUtils::inputBorder()));
     }
 
     if (editable) {

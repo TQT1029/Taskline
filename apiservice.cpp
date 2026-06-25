@@ -118,7 +118,7 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
 /**
  * @brief Xóa một Task dựa trên ID
  */
-void APIService::deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback) {
+void APIService::deleteTask(QString taskId, std::function<void(bool, QJsonArray)> callback) {
     QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskId)); 
     QNetworkReply *reply = manager->deleteResource(request);
     handleSslErrors(reply);

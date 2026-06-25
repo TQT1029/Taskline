@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <QTextEdit>
 #include "taskdialog.h"
+#include "ThemeUtils.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -15,6 +16,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     this->setWindowTitle("Taskline");
+    this->setMaximumWidth(660);
+    this->setMinimumWidth(380);
     if (ui->menubar) {
         ui->menubar->hide();
     }
@@ -40,7 +43,7 @@ void MainWindow::setupUI()
 
     // 1. Khởi tạo topBar và Layout ngang
     topBar = new QWidget(this);
-    topBar->setStyleSheet("background-color: #2c3e50;");
+    topBar->setStyleSheet(QString("background-color: %1; border-bottom: 1px solid %2;").arg(ThemeUtils::bgBar(), ThemeUtils::border()));
 
     topBarLayout = new QHBoxLayout(topBar);
     topBarLayout->setContentsMargins(15, 0, 15, 0); 
@@ -49,20 +52,20 @@ void MainWindow::setupUI()
     // 2. Khởi tạo nút Menu
     menuButton = new QToolButton(topBar);
     menuButton->setText("≡");
-    menuButton->setStyleSheet(
-        "QToolButton {"
-        "   color: white; font-size: 40px; background: transparent;"
-        "   border: none; padding-bottom: 4px;"
-        "}"
-        "QToolButton:hover { color: #3498db; }"
-        );
+    menuButton->setStyleSheet(QString(
+                                  "QToolButton {"
+                                  "   color: %1; font-size: 40px; background: transparent;"
+                                  "   border: none; padding-bottom: 4px;"
+                                  "}"
+                                  "QToolButton:hover { color: %2; }"
+                                  ).arg(ThemeUtils::textMain(), ThemeUtils::btnPrimary()));
 
     // 3. Khởi tạo nhãn Taskline
     titleLabel = new QLabel("Taskline", topBar);
-    titleLabel->setStyleSheet(
-        "color: white; font-size: 22px; font-weight: bold;"
-        "font-family: 'Segoe UI', sans-serif; border: none;"
-        );
+    titleLabel->setStyleSheet(QString(
+                                  "color: %1; font-size: 22px; font-weight: bold;"
+                                  "font-family: 'Segoe UI', sans-serif; border: none;"
+                                  ).arg(ThemeUtils::textMain()));
 
     topBarLayout->addWidget(menuButton); 
     topBarLayout->addWidget(titleLabel); 
@@ -70,30 +73,22 @@ void MainWindow::setupUI()
 
     // 4. Khởi tạo nút + New
     newButton = new QPushButton("+ New", topBar);
-    newButton->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #3498db; color: white; border-radius: 13px;"
-        "   font-weight: bold; font-size: 15px; border: none;"
-        "   min-width: 60px; min-height: 38px; padding: 0px 20px;"
-        "}"
-        "QPushButton:hover { background-color: #2980b9; }"
-        "QPushButton:pressed { background-color: #1c5980; }"
-        );
+    newButton->setStyleSheet(QString(
+                                 "QPushButton {"
+                                 "   background-color: %1; color: %2; border-radius: 13px;"
+                                 "   font-weight: bold; font-size: 15px; border: none;"
+                                 "   min-width: 60px; min-height: 38px; padding: 0px 20px;"
+                                 "}"
+                                 "QPushButton:hover { background-color: %3; }"
+                                 ).arg(ThemeUtils::btnPrimary(), ThemeUtils::btnPrimaryText(), ThemeUtils::btnPrimaryHover()));
     topBarLayout->addWidget(newButton);
 
     // 5. ScrollArea
     scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true); 
-    scrollArea->setStyleSheet(
-        "QScrollArea { background-color: #ecf0f1; border: none; }"
-        "QScrollBar:vertical {"
-        "   border: none; background: #e2e8f0; width: 8px; margin: 0px;"
-        "}"
-        "QScrollBar::handle:vertical {"
-        "   background: #cbd5e1; border-radius: 4px; min-height: 20px;"
-        "}"
-        "QScrollBar::handle:vertical:hover { background: #94a3b8; }"
-        );
+    scrollArea->setStyleSheet(QString(
+                                  "QScrollArea { background-color: %1; border: none; }"
+                                  ).arg(ThemeUtils::bgApp()));
 
     scrollContent = new QWidget();
     scrollContent->setStyleSheet("background: transparent;"); 
@@ -107,18 +102,18 @@ void MainWindow::setupUI()
 
     // 6. BottomBar
     bottomBar = new QWidget(this);
-    bottomBar->setStyleSheet("background-color: #ecf0f1;");
+    bottomBar->setStyleSheet(QString("background-color: %1; border-top: 1px solid %2;").arg(ThemeUtils::bgBar(), ThemeUtils::border()));
     bottomBarLayout = new QHBoxLayout(bottomBar);
     bottomBarLayout->setContentsMargins(15, 10, 15, 10);
     
     undoButton = new QPushButton("⟲ Undo", bottomBar);
-    undoButton->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #f39c12; color: white; font-weight: bold; font-size: 14px;"
-        "   border-radius: 6px; padding: 6px 15px;"
-        "}"
-        "QPushButton:hover { background-color: #e67e22; }"
-        );
+    undoButton->setStyleSheet(QString(
+                                  "QPushButton {"
+                                  "   background-color: %1; color: %2; font-weight: bold; font-size: 14px;"
+                                  "   border: 1px solid %3; border-radius: 6px; padding: 6px 15px;"
+                                  "}"
+                                  "QPushButton:hover { background-color: %4; }"
+                                  ).arg(ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::border(), ThemeUtils::btnSecondaryHover()));
     bottomBarLayout->addStretch();
     bottomBarLayout->addWidget(undoButton);
 
@@ -231,16 +226,16 @@ QWidget* MainWindow::createTextContainer(const Task &task, QWidget *parent) {
     textLayout->setSpacing(5);
 
     QLabel *nameLabel = new QLabel(task.getTitle(), textContainer);
-    QString textStyle = "color: #2c3e50; font-size: 18px; font-weight: bold; background: transparent;";
+    QString textStyle = QString("color: %1; font-size: 18px; font-weight: bold; background: transparent;").arg(ThemeUtils::textMain());
     if (task.getStatus() == TaskStatus::DONE) {
-        textStyle += " text-decoration: line-through; color: #95a5a6;";
+        textStyle += QString(" text-decoration: line-through; color: %1;").arg(ThemeUtils::textDone());
     }
     nameLabel->setStyleSheet(textStyle);
 
-    QTextEdit *descriptionLabel = createDescriptionLabel(task.getDescription(), textContainer);
+    QLabel *descriptionLabel = createDescriptionLabel(task.getDescription(), textContainer);
 
     QLabel *priorityLabel = new QLabel("Độ ưu tiên: " + QString::number(task.getPriority()), textContainer);
-    priorityLabel->setStyleSheet("font-size: 13px; color: #2f3542; font-weight: 500; background: transparent;");
+    priorityLabel->setStyleSheet(QString("font-size: 13px; color: %1; font-weight: 500; background: transparent;").arg(ThemeUtils::textSub()));
 
     QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
     QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
@@ -248,7 +243,7 @@ QWidget* MainWindow::createTextContainer(const Task &task, QWidget *parent) {
     if (task.isOverdue()) {
         deadlineStyle += " color: #e74c3c; font-weight: bold;";
     } else {
-        deadlineStyle += " color: #7f8c8d;";
+        deadlineStyle += QString(" color: %1;").arg(ThemeUtils::textSub());
     }
     deadlineLabel->setStyleSheet(deadlineStyle);
 
@@ -260,28 +255,33 @@ QWidget* MainWindow::createTextContainer(const Task &task, QWidget *parent) {
     return textContainer;
 }
 
-QTextEdit* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent) {
-    QTextEdit *descriptionLabel = new QTextEdit(parent);
-    descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent; border: none;");
-    descriptionLabel->setWordWrapMode(QTextOption::WrapAnywhere);
-    descriptionLabel->setReadOnly(true);
-    descriptionLabel->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    descriptionLabel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    descriptionLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
-    descriptionLabel->document()->setDocumentMargin(0);
-    descriptionLabel->setMaximumHeight(65);
-    descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+QLabel* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent) {
+    QLabel *descriptionLabel = new QLabel(parent);
+    descriptionLabel->setStyleSheet(QString("font-size: 14px; color: %1; background: transparent; border: none;").arg(ThemeUtils::textSub()));
+    descriptionLabel->setWordWrap(true);
+    descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     QString rawDesc = desc.trimmed();
     if (rawDesc.isEmpty()) {
         descriptionLabel->setText("(Không có mô tả)");
     } else {
         int maxChars = 115;
-        if (rawDesc.length() > maxChars) {
-            descriptionLabel->setText(rawDesc.left(maxChars).trimmed() + "...");
-        } else {
-            descriptionLabel->setText(rawDesc);
+        QString displayDesc = rawDesc;
+        if (displayDesc.length() > maxChars) {
+            displayDesc = displayDesc.left(maxChars).trimmed() + "...";
         }
+        
+        // Chèn zero-width space (\u200B) để QLabel có thể tự do wrap/break-word
+        // đối với các chuỗi dài liên tục không có dấu cách (như "awwwgydgyddd...")
+        // mà vẫn giữ nguyên khả năng co giãn chiều cao (auto-scale height).
+        QString wrappedDesc;
+        for (int i = 0; i < displayDesc.length(); ++i) {
+            wrappedDesc += displayDesc[i];
+            if (displayDesc[i] != ' ') {
+                wrappedDesc += QChar(0x200B);
+            }
+        }
+        descriptionLabel->setText(wrappedDesc);
     }
     return descriptionLabel;
 }
@@ -298,13 +298,13 @@ QWidget* MainWindow::createStatusBadge(TaskStatus status, QWidget *parent) {
     return statusColorWidget;
 }
 
-QToolButton* MainWindow::createDeleteButton(int taskId, QWidget *parent) {
+QToolButton* MainWindow::createDeleteButton(QString taskId, QWidget *parent) {
     QToolButton *deleteBtn = new QToolButton(parent);
     deleteBtn->setText("🗑");
     deleteBtn->setStyleSheet(
         "QToolButton { color: #e74c3c; font-size: 18px; background: transparent; border: none; }"
         "QToolButton:hover { color: #c0392b; font-size: 20px; }"
-    );
+        );
     deleteBtn->setProperty("taskId", taskId);
     connect(deleteBtn, &QToolButton::clicked, this, &MainWindow::onDeleteTaskClicked);
     return deleteBtn;
@@ -312,7 +312,26 @@ QToolButton* MainWindow::createDeleteButton(int taskId, QWidget *parent) {
 
 QCheckBox* MainWindow::createStatusCheckBox(const Task &task, QWidget *parent) {
     QCheckBox *checkBox = new QCheckBox(parent);
-    checkBox->setStyleSheet("QCheckBox::indicator { width: 20px; height: 20px; }");
+    // Tăng kích thước bộ chỉ thị (ô vuông) để nó nổi bật hơn mà vẫn giữ nguyên giao diện gốc của OS (tránh mất dấu tick)
+    checkBox->setStyleSheet(QString(
+        "QCheckBox::indicator {"
+        "   width: 22px;"
+        "   height: 22px;"
+        "   border-radius: 5px;"
+        "   border: 2px solid #bdc3c7;"
+        "   background-color: %1;"
+        "}"
+
+
+        "QCheckBox::indicator:hover {"
+        "   border: 2px solid #3498db;"
+        "}"
+
+        "QCheckBox::indicator:checked {"
+        "   background-color: %2;"
+        "   border: 2px solid #2ecc71;"
+        "   image: url(:/Assets/icons/check.png)"
+        "}").arg(ThemeUtils::checkBoxBgNormal(), ThemeUtils::checkBoxBgChecked()));
     checkBox->setChecked(task.getStatus() == TaskStatus::DONE);
     checkBox->setProperty("taskId", task.getId());
     connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
@@ -322,15 +341,15 @@ QCheckBox* MainWindow::createStatusCheckBox(const Task &task, QWidget *parent) {
 void MainWindow::renderTaskItem(const Task &task) {
     QWidget *taskItem = new QWidget(scrollContent);
     taskItem->setObjectName("taskItem");
-    taskItem->setStyleSheet(
-        "QWidget#taskItem {"
-        "   background-color: white; border-radius: 10px;"
-        "   border: 1px solid #dcdde1; min-height: 60px;"
-        "}"
-        "QWidget#taskItem:hover {"
-        "   border: 1px solid #3498db; background-color: #f8fbfc;"
-        "}"
-    );
+    taskItem->setStyleSheet(QString(
+                                "QWidget#taskItem {"
+                                "   background-color: %1; border-radius: 10px;"
+                                "   border: 1px solid %2; height: auto;"
+                                "}"
+                                "QWidget#taskItem:hover {"
+                                "   border: 1px solid %3; background-color: %4;"
+                                "}"
+                                ).arg(ThemeUtils::itemBg(), ThemeUtils::itemBorder(), ThemeUtils::itemHoverBorder(), ThemeUtils::itemHoverBg()));
 
     QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
     taskLayout->setContentsMargins(15, 10, 15, 10);
@@ -357,7 +376,7 @@ void MainWindow::onTaskStatusChanged(int state)
 {
     QCheckBox *senderCb = qobject_cast<QCheckBox*>(sender());
     if (senderCb) {
-        int taskId = senderCb->property("taskId").toInt();
+        QString taskId = senderCb->property("taskId").toString();
         QList<Task> allTasks = taskManager.getAllTasks();
         Task targetTask = allTasks.first(); 
         
@@ -395,7 +414,7 @@ void MainWindow::onDeleteTaskClicked()
 {
     QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
     if (senderBtn) {
-        int taskId = senderBtn->property("taskId").toInt();
+        QString taskId = senderBtn->property("taskId").toString();
         taskManager.deleteTask(taskId);
         taskManager.saveToFile(dataFilePath);
 
@@ -442,7 +461,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     if (event->type() == QEvent::MouseButtonRelease) {
         QWidget *widget = qobject_cast<QWidget*>(watched);
         if (widget && widget->property("taskId").isValid()) {
-            int taskId = widget->property("taskId").toInt();
+            QString taskId = widget->property("taskId").toString();
             
             QList<Task> allTasks = taskManager.getAllTasks();
             for (const Task &t : allTasks) {

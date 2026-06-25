@@ -7,6 +7,7 @@
 #include <QFormLayout>
 #include <QPushButton>
 #include <QHBoxLayout>
+#include "ThemeUtils.h"
 
 class FilterDialog : public QDialog {
     Q_OBJECT
@@ -18,28 +19,28 @@ public:
         setMinimumWidth(340);
         setContentsMargins(20, 20, 20, 20);
 
-        this->setStyleSheet(
+        this->setStyleSheet(QString(
             // Nền của Dialog
-            "QDialog { background-color: #f8fafc; }"
+            "QDialog { background-color: %1; }"
 
             // Định dạng chung cho Nhãn chữ (Labels)
-            "QLabel { color: #2c3e50; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }"
+            "QLabel { color: %2; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }"
 
             // Định dạng cho ô ComboBox và SpinBox
             "QComboBox, QSpinBox {"
-            "    background-color: white;"
-            "    border: 1px solid #cbd5e1;"
+            "    background-color: %3;"
+            "    border: 1px solid %4;"
             "    border-radius: 8px;"
             "    padding: 6px 12px;"
             "    font-size: 14px;"
-            "    color: #334155;"
+            "    color: %5;"
             "    min-height: 25px;"
             "}"
             "QComboBox:hover, QSpinBox:hover {"
-            "    border: 1px solid #3498db;"
+            "    border: 1px solid %6;"
             "}"
             "QComboBox:focus, QSpinBox:focus {"
-            "    border: 1px solid #2980b9;"
+            "    border: 1px solid %6;"
             "}"
 
             // 1. Tùy chỉnh phần mũi tên của ComboBox (Cho đồng bộ)
@@ -55,21 +56,21 @@ public:
             "    subcontrol-position: top right;" // Đặt nút tăng ở góc trên bên phải
             "    width: 25px;"                     // Tăng độ rộng để hitbox to hơn
             "    border-top-right-radius: 8px;"    // Bo góc theo khung viền cha
-            "    border-left: 1px solid #cbd5e1;"
-            "    border-bottom: 1px solid #cbd5e1;"
-            "    background: #f1f5f9;"
+            "    border-left: 1px solid %4;"
+            "    border-bottom: 1px solid %4;"
+            "    background: %7;"
             "}"
-            "QSpinBox::up-button:hover { background: #e2e8f0; }"
+            "QSpinBox::up-button:hover { background: %8; }"
 
             "QSpinBox::down-button {"
             "    subcontrol-origin: border;"
             "    subcontrol-position: bottom right;" // Đặt nút giảm ở góc dưới bên phải
             "    width: 25px;"                       // Tăng độ rộng bằng nút tăng
             "    border-bottom-right-radius: 8px;"   // Bo góc theo khung viền cha
-            "    border-left: 1px solid #cbd5e1;"
-            "    background: #f1f5f9;"
+            "    border-left: 1px solid %4;"
+            "    background: %7;"
             "}"
-            "QSpinBox::down-button:hover { background: #e2e8f0; }"
+            "QSpinBox::down-button:hover { background: %8; }"
 
             "QSpinBox {"
             "    padding-right: 30px;"
@@ -77,30 +78,37 @@ public:
 
             // Định dạng nút "Áp dụng" (Nút chính)
             "QPushButton#okBtn {"
-            "    background-color: #3498db;"
-            "    color: white;"
+            "    background-color: %9;"
+            "    color: %10;"
             "    font-weight: bold;"
             "    font-size: 14px;"
             "    border-radius: 8px;"
             "    min-height: 35px;"
             "    border: none;"
             "}"
-            "QPushButton#okBtn:hover { background-color: #2980b9; }"
-            "QPushButton#okBtn:pressed { background-color: #1c5980; }"
+            "QPushButton#okBtn:hover { background-color: %11; }"
 
             // Định dạng nút "Hủy" (Nút phụ)
             "QPushButton#cancelBtn {"
-            "    background-color: #e2e8f0;"
-            "    color: #475569;"
+            "    background-color: %12;"
+            "    color: %13;"
             "    font-weight: bold;"
             "    font-size: 14px;"
             "    border-radius: 8px;"
             "    min-height: 35px;"
             "    border: none;"
             "}"
-            "QPushButton#cancelBtn:hover { background-color: #cbd5e1; }"
-            "QPushButton#cancelBtn:pressed { background-color: #94a3b8; }"
-            );
+            "QPushButton#cancelBtn:hover { background-color: %14; }"
+            "QComboBox QAbstractItemView {"
+            "   background-color: %15;"
+            "   color: %16;"
+            "   selection-background-color: %9;"
+            "}"
+            ).arg(ThemeUtils::dialogBg(), ThemeUtils::textMain(), ThemeUtils::inputBg(), ThemeUtils::inputBorder(), ThemeUtils::textMain())
+             .arg(ThemeUtils::inputFocus(), ThemeUtils::spinBtnBg(), ThemeUtils::spinBtnHover(), ThemeUtils::btnPrimary(), ThemeUtils::btnPrimaryText())
+             .arg(ThemeUtils::btnPrimaryHover(), ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::btnSecondaryHover())
+             .arg(ThemeUtils::comboDropBg(), ThemeUtils::textMain())
+        );
 
         QFormLayout *layout = new QFormLayout(this);
         layout->setSpacing(15);
