@@ -1,56 +1,62 @@
 #include "task.h"
 
 // Sử dụng Member Initializer List để khởi tạo giá trị cho các biến
-Task::Task(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline)
-    : id(id), title(title), description(description), status(status), priority(priority), deadline(deadline) {}
-
+Task::Task(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline){
+    taskStats.id = id;
+    taskStats.title = title;
+    taskStats.description = description;
+    taskStats.status = status;
+    taskStats.priority = priority;
+    taskStats.deadline = deadline;
+}
+// Getter
 int Task::getId() const {
-    return id;
+    return taskStats.id;
 }
 
 QString Task::getTitle() const {
-    return title;
+    return taskStats.title;
 }
 
 QString Task::getDescription() const {
-    return description;
+    return taskStats.description;
 }
 
 TaskStatus Task::getStatus() const {
-    return status;
+    return taskStats.status;
 }
 
 int Task::getPriority() const {
-    return priority;
+    return taskStats.priority;
 }
 
 QDateTime Task::getDeadline() const {
-    return deadline;
+    return taskStats.deadline;
 }
-
+// Setter
 void Task::setTitle(QString newTitle) {
-    title = newTitle;
+    taskStats.title = newTitle;
 }
 
 void Task::setDescription(QString newDescription) {
-    description = newDescription;
+    taskStats.description = newDescription;
 }
 
 void Task::setStatus(TaskStatus newStatus) {
-    status = newStatus;
+    taskStats.status = newStatus;
 }
 
 bool Task::isOverdue() const {
     // So sánh thời gian hiện tại với deadline và check xem đã hoàn thành chưa
-    return (QDateTime::currentDateTime() > deadline && status != TaskStatus::DONE);
+    return (QDateTime::currentDateTime() > taskStats.deadline && taskStats.status != TaskStatus::DONE);
 }
 
 QString Task::statusToString(TaskStatus status) {
     switch (status) {
-        case TaskStatus::TODO: return "chưa làm";
-        case TaskStatus::IN_PROGRESS: return "đang làm";
-        case TaskStatus::DONE: return "hoàn thành";
-        default: return "không xác định";
+    case TaskStatus::TODO: return "chưa làm";
+    case TaskStatus::IN_PROGRESS: return "đang làm";
+    case TaskStatus::DONE: return "hoàn thành";
+    default: return "không xác định";
     }
 }
 
