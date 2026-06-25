@@ -10,7 +10,7 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
     // Style
     setStyleSheet(
         "QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateTimeEdit {"
-        "   border: 1px solid #bdc3c7; border-radius: 4px; padding: 5px; background: white;"
+        "   border: 1px solid #bdc3c7; border-radius: 4px; padding: 5px; background: white; color: #2c3e50;"
         "}"
 
         // TÙY CHỈNH NÚT TĂNG GIẢM CỦA SPINBOX ĐỂ GIỐNG DIALOG BỘ LỌC
@@ -131,7 +131,7 @@ void TaskDialog::setEditMode(bool editable)
     descInput->setReadOnly(!editable);
 
     if (editable) {
-        descInput->setStyleSheet("background-color: white; color: black;");
+        descInput->setStyleSheet("background-color: white; color: #2c3e50;");
     } else {
         descInput->setStyleSheet("background-color: #f5f5f5; color: #7f8c8d;");
     }

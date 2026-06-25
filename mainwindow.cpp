@@ -5,24 +5,36 @@
 #include <QDir>
 #include <QEvent>
 #include <algorithm>
+#include <QTextEdit>
 #include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
-
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    this->setWindowTitle(" ");
+    this->setWindowTitle("Taskline");
     if (ui->menubar) {
         ui->menubar->hide();
     }
 
+    setupUI();
+    initData();
+
+    connect(newButton, &QPushButton::clicked, this, &MainWindow::addNewTask);
+    connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
+    connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
+
+    refreshTaskList();
+}
+
+void MainWindow::setupUI()
+{
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
     mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(0 ,0 ,0 ,0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
     // 1. Khởi tạo topBar và Layout ngang
@@ -30,74 +42,47 @@ MainWindow::MainWindow(QWidget *parent)
     topBar->setStyleSheet("background-color: #2c3e50;");
 
     topBarLayout = new QHBoxLayout(topBar);
-    topBarLayout->setContentsMargins(15, 0, 15, 0); // Cách lề trái/phải 15px cho đẹp
-    topBarLayout->setSpacing(15);                  // Khoảng cách giữa nút 3 gạch và chữ Task
+    topBarLayout->setContentsMargins(15, 0, 15, 0); 
+    topBarLayout->setSpacing(15);                  
 
-    // 2. Khởi tạo và định dạng nút 3 gạch (Menu Button)
+    // 2. Khởi tạo nút Menu
     menuButton = new QToolButton(topBar);
-    menuButton->setText("≡"); // Ký tự 3 gạch (Hoặc dùng "☰")
+    menuButton->setText("≡");
     menuButton->setStyleSheet(
         "QToolButton {"
-        "   color: white;"
-        "   font-size: 40px;"            // Làm cho dấu 3 gạch to lên
-        "   background: transparent;"    // Nền trong suốt
-        "   border: none;"
-        "   padding-bottom: 4px;"        // Căn chỉnh nhẹ vị trí ký tự
+        "   color: white; font-size: 40px; background: transparent;"
+        "   border: none; padding-bottom: 4px;"
         "}"
-        "QToolButton:hover {"
-        "   color: #3498db;"             // Đổi sang màu xanh khi rê chuột vào
-        "}"
-        );
+        "QToolButton:hover { color: #3498db; }"
+    );
 
-    // 3. Khởi tạo và định dạng nhãn chữ "Task"
+    // 3. Khởi tạo nhãn Taskline
     titleLabel = new QLabel("Taskline", topBar);
     titleLabel->setStyleSheet(
-        "color: white;"
-        "font-size: 22px;"
-        "font-weight: bold;"
-        "font-family: 'Segoe UI', sans-serif;"
-        "border: none;"
-        );
+        "color: white; font-size: 22px; font-weight: bold;"
+        "font-family: 'Segoe UI', sans-serif; border: none;"
+    );
 
-    // 4. Thêm các thành phần vào Layout theo thứ tự từ trái sang phải
-    topBarLayout->addWidget(menuButton); // Nút 3 gạch nằm ngoài cùng bên trái
-    topBarLayout->addWidget(titleLabel); // Chữ Task nằm kế bên
-
-    // 5. Thêm một khoảng trống lò xo (Spacer) ở cuối
-    // Lò xo này sẽ tự giãn ra và ĐẨY nút + chữ về sát cạnh trái
+    topBarLayout->addWidget(menuButton); 
+    topBarLayout->addWidget(titleLabel); 
     topBarLayout->addStretch();
 
+    // 4. Khởi tạo nút + New
     newButton = new QPushButton("+ New", topBar);
     newButton->setStyleSheet(
         "QPushButton {"
-        "   background-color: #3498db;"  // Màu nền xanh dương
-        "   color: white;"               // Màu chữ trắng
-        "   border-radius: 13px;"        // ⭐ Bo góc chuẩn 13px theo yêu cầu
-        "   font-weight: bold;"          // Chữ in đậm
-        "   font-size: 15px;"            // ⭐ Tăng cỡ chữ lên một chút cho cân đối
-        "   border: none;"               // Xóa viền mặc định
-
-        // ⭐ BÍ QUYẾT LÀM NÚT TO RA VÀ CHỮ Ở GIỮA:
-        "   min-width: 60px;"           // ⭐ Chiều rộng tối thiểu của nút
-        "   min-height: 38px;"           // ⭐ Chiều cao tối thiểu (làm nút to ra rõ rệt)
-        "   padding: 0px 20px 0px 20px;"          // ⭐ Đệm đều 2 bên, chữ tự động khóa ở tâm nút
+        "   background-color: #3498db; color: white; border-radius: 13px;"
+        "   font-weight: bold; font-size: 15px; border: none;"
+        "   min-width: 60px; min-height: 38px; padding: 0px 20px;"
         "}"
-        "QPushButton:hover {"
-        "   background-color: #2980b9;"  // Màu khi hover
-        "}"
-        "QPushButton:pressed {"
-        "   background-color: #1c5980;"  // Màu khi click
-        "}"
-        );
-
+        "QPushButton:hover { background-color: #2980b9; }"
+        "QPushButton:pressed { background-color: #1c5980; }"
+    );
     topBarLayout->addWidget(newButton);
 
-
-    scrollArea = new QScrollArea(ui->centralwidget);
-    scrollArea->setWidgetResizable(true); // ⭐ QUAN TRỌNG: Cho phép nội dung tự co giãn theo chiều rộng
-    scrollArea->setStyleSheet("background-color: #ecf0f1;"); // Màu nền vùng cuộn
-
-    // Tùy chỉnh thanh cuộn nhìn cho thanh lịch, hiện đại hơn (QSS)
+    // 5. ScrollArea
+    scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true); 
     scrollArea->setStyleSheet(
         "QScrollArea { background-color: #ecf0f1; border: none; }"
         "QScrollBar:vertical {"
@@ -107,26 +92,19 @@ MainWindow::MainWindow(QWidget *parent)
         "   background: #cbd5e1; border-radius: 4px; min-height: 20px;"
         "}"
         "QScrollBar::handle:vertical:hover { background: #94a3b8; }"
-        );
+    );
 
-    // 2. Khởi tạo Widget "Ruột" để chứa tất cả nội dung dài sau này
     scrollContent = new QWidget();
-    scrollContent->setStyleSheet("background: transparent;"); // Để lộ màu nền của scrollArea
-
-    // 3. Tạo Layout cho Widget "Ruột" này để xếp nội dung theo chiều dọc
+    scrollContent->setStyleSheet("background: transparent;"); 
+    
     contentLayout = new QVBoxLayout(scrollContent);
-    contentLayout->setContentsMargins(20, 20, 20, 20); // Tạo khoảng đệm xung quanh nội dung
-    contentLayout->setSpacing(15);                     // Khoảng cách giữa các item bên trong
-
+    contentLayout->setContentsMargins(20, 20, 20, 20); 
+    contentLayout->setSpacing(15);                     
     contentLayout->setAlignment(Qt::AlignTop);
-    // 4. Gắn cái "Ruột" vào khung cuộn QScrollArea
+    
     scrollArea->setWidget(scrollContent);
 
-    // 5. Thêm topBar (Cố định) và scrollArea (Cuộn được) vào layout chính của màn hình
-    mainLayout->addWidget(topBar, 0);      
-    mainLayout->addWidget(scrollArea, 1);
-
-    // 6. Khởi tạo bottomBar chứa nút Undo
+    // 6. BottomBar
     bottomBar = new QWidget(this);
     bottomBar->setStyleSheet("background-color: #ecf0f1;");
     bottomBarLayout = new QHBoxLayout(bottomBar);
@@ -142,19 +120,17 @@ MainWindow::MainWindow(QWidget *parent)
     );
     bottomBarLayout->addStretch();
     bottomBarLayout->addWidget(undoButton);
-    
-    mainLayout->addWidget(bottomBar, 0);
 
-    // Tải dữ liệu từ TaskManager
+    // Ghép Layout
+    mainLayout->addWidget(topBar, 0);      
+    mainLayout->addWidget(scrollArea, 1);
+    mainLayout->addWidget(bottomBar, 0);
+}
+
+void MainWindow::initData()
+{
     dataFilePath = QDir::currentPath() + "/tasks.json";
     taskManager.loadFromFile(dataFilePath);
-    
-    connect(newButton, &QPushButton::clicked, this, &MainWindow::addNewTask);
-    connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
-    connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
-
-    // Hiển thị danh sách task ban đầu
-    refreshTaskList();
 }
 
 MainWindow::~MainWindow()
@@ -258,14 +234,19 @@ void MainWindow::refreshTaskList()
         }
         nameLabel->setStyleSheet(textStyle);
 
-        // ⭐ 2. DÒNG MÔ TẢ: Thay đổi từ setFixedHeight sang setMaximumHeight để tự co lại khi text ngắn
-        QLabel *descriptionLabel = new QLabel(textContainer);
-        descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent;");
-        descriptionLabel->setWordWrap(true);       // Cho phép tự động xuống dòng khi chạm lề
+        // ⭐ 2. DÒNG MÔ TẢ: Sử dụng QTextEdit thay vì QLabel để hỗ trợ bẻ từ liên tục (WrapAnywhere)
+        QTextEdit *descriptionLabel = new QTextEdit(textContainer);
+        descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent; border: none;");
+        descriptionLabel->setWordWrapMode(QTextOption::WrapAnywhere); // Cắt từ ở bất kỳ đâu
+        descriptionLabel->setReadOnly(true);
+        descriptionLabel->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        descriptionLabel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        descriptionLabel->setAttribute(Qt::WA_TransparentForMouseEvents); // Cho phép click xuyên qua để mở TaskDialog
+        descriptionLabel->document()->setDocumentMargin(0);
 
         // Dùng tối đa (Maximum) thay vì cố định (Fixed) giúp triệt tiêu khoảng trống thừa khi mô tả ngắn
         descriptionLabel->setMaximumHeight(65);
-        descriptionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+        descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
         QString rawDesc = task.getDescription().trimmed();
         if (rawDesc.isEmpty()) {

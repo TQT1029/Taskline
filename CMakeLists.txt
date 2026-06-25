@@ -26,17 +26,16 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(Taskline
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        Task.h
-        Task.h task.cpp
         task.h
+        task.cpp
+        TaskStats.h
         taskmanager.h
         taskmanager.cpp
         taskdialog.h
         taskdialog.cpp
         filterdialog.h
-        ../Testing/apiservice.h
-        apiservice.h apiservice.cpp
-        TaskStats.h
+        apiservice.h
+        apiservice.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET Taskline APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

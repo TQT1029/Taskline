@@ -28,6 +28,10 @@ public:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
+private:
+    void setupUI();
+    void initData();
+
 private slots:
     void addNewTask();
     void refreshTaskList();

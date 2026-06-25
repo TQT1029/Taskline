@@ -37,7 +37,7 @@ void handleSslErrors(QNetworkReply *reply) {
  * @param callback Hàm callback trả về trạng thái (thành công/thất bại) và dữ liệu JSON
  */
 void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest("/get-tasks"); // GET endpoint
+    QNetworkRequest request = createRequest("/tasks"); // GET endpoint
     QNetworkReply *reply = manager->get(request);
     handleSslErrors(reply); // Quan trọng để localhost HTTPS không bị chặn
 
@@ -58,7 +58,7 @@ void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
  * @brief Tạo mới một Task và gửi lên server
  */
 void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest("/get-new-task"); // POST endpoint (dựa theo code cũ của bạn)
+    QNetworkRequest request = createRequest("/tasks"); // POST endpoint
     
     QJsonObject json;
     json["ID"] = taskStats.id;
@@ -89,8 +89,8 @@ void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJs
  * @brief Cập nhật thông tin của một Task
  */
 void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback) {
-    // Thường update dùng ID trên URL, ví dụ: /update-task/123
-    QNetworkRequest request = createRequest(QString("/update-task/%1").arg(taskStats.id)); 
+    // Thường update dùng ID trên URL, ví dụ: /tasks/123
+    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.id)); 
     
     QJsonObject json;
     json["Title"] = taskStats.title;
@@ -119,7 +119,7 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
  * @brief Xóa một Task dựa trên ID
  */
 void APIService::deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest(QString("/delete-task/%1").arg(taskId)); 
+    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskId)); 
     QNetworkReply *reply = manager->deleteResource(request);
     handleSslErrors(reply);
 
@@ -139,7 +139,7 @@ void APIService::deleteTask(int taskId, std::function<void(bool, QJsonArray)> ca
  * @brief Lấy danh sách Task đã được server sắp xếp
  */
 void APIService::sortTasks(std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest("/sort-tasks");
+    QNetworkRequest request = createRequest("/tasks/sorted");
     QNetworkReply *reply = manager->get(request);
     handleSslErrors(reply);
 
@@ -159,7 +159,7 @@ void APIService::sortTasks(std::function<void(bool, QJsonArray)> callback) {
  * @brief Lấy danh sách Task quá hạn từ server
  */
 void APIService::getOverdue(std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest("/get-overdue");
+    QNetworkRequest request = createRequest("/tasks/overdue");
     QNetworkReply *reply = manager->get(request);
     handleSslErrors(reply);
 
