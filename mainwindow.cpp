@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "filterdialog.h"
+#include "apiservice.h"
 #include "./ui_mainwindow.h"
 #include <QDateTime>
 #include <QDir>
@@ -150,6 +151,22 @@ void MainWindow::addNewTask()
             dialog.getDeadline()
             );
         taskManager.saveToFile(dataFilePath);
+
+        // Lấy task vừa tạo (nằm cuối cùng trong danh sách)
+        QList<Task> all = taskManager.getAllTasks();
+        if (!all.isEmpty()) {
+            TaskStats ts;
+            ts.id = all.last().getId();
+            ts.title = dialog.getTitle();
+            ts.description = dialog.getDescription();
+            ts.status = dialog.getStatus();
+            ts.priority = dialog.getPriority();
+            ts.deadline = dialog.getDeadline();
+            APIService::instance().createNewTask(ts, [](bool success, QJsonArray data){
+                // Xử lý khi API phản hồi (không bắt buộc vì dùng local làm chính hiện tại)
+            });
+        }
+        
         refreshTaskList();
     }
 }
@@ -207,27 +224,8 @@ QList<Task> MainWindow::getFilteredAndSortedTasks() {
     return displayTasks;
 }
 
-void MainWindow::renderTaskItem(const Task &task) {
-    QWidget *taskItem = new QWidget(scrollContent);
-    taskItem->setObjectName("taskItem");
-    taskItem->setStyleSheet(
-        "QWidget#taskItem {"
-        "   background-color: white;"
-        "   border-radius: 10px;"
-        "   border: 1px solid #dcdde1;"
-        "   min-height: 60px;"
-        "}"
-        "QWidget#taskItem:hover {"
-        "   border: 1px solid #3498db;"
-        "   background-color: #f8fbfc;"
-        "}"
-        );
-    // taskItem->setFixedHeight(160);
-
-    QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
-    taskLayout->setContentsMargins(15, 10, 15, 10);
-
-    QWidget *textContainer = new QWidget(taskItem);
+QWidget* MainWindow::createTextContainer(const Task &task, QWidget *parent) {
+    QWidget *textContainer = new QWidget(parent);
     QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
     textLayout->setContentsMargins(0, 0, 0, 0);
     textLayout->setSpacing(5);
@@ -239,41 +237,13 @@ void MainWindow::renderTaskItem(const Task &task) {
     }
     nameLabel->setStyleSheet(textStyle);
 
-    // ⭐ 2. DÒNG MÔ TẢ: Sử dụng QTextEdit thay vì QLabel để hỗ trợ bẻ từ liên tục (WrapAnywhere)
-    QTextEdit *descriptionLabel = new QTextEdit(textContainer);
-    descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent; border: none;");
-    descriptionLabel->setWordWrapMode(QTextOption::WrapAnywhere); // Cắt từ ở bất kỳ đâu
-    descriptionLabel->setReadOnly(true);
-    descriptionLabel->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    descriptionLabel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    descriptionLabel->setAttribute(Qt::WA_TransparentForMouseEvents); // Cho phép click xuyên qua để mở TaskDialog
-    descriptionLabel->document()->setDocumentMargin(0);
+    QTextEdit *descriptionLabel = createDescriptionLabel(task.getDescription(), textContainer);
 
-    // Dùng tối đa (Maximum) thay vì cố định (Fixed) giúp triệt tiêu khoảng trống thừa khi mô tả ngắn
-    descriptionLabel->setMaximumHeight(65);
-    descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-
-    QString rawDesc = task.getDescription().trimmed();
-    if (rawDesc.isEmpty()) {
-        descriptionLabel->setText("(Không có mô tả)");
-    } else {
-        // Giới hạn số lượng ký tự để đảm bảo text tối đa 3 dòng và luôn xuất hiện dấu "..."
-        int maxChars = 115;
-        if (rawDesc.length() > maxChars) {
-            QString shortDesc = rawDesc.left(maxChars).trimmed() + "...";
-            descriptionLabel->setText(shortDesc);
-        } else {
-            descriptionLabel->setText(rawDesc);
-        }
-    }
-
-    // 3. Dòng Mức độ ưu tiên (Mới thêm)
     QLabel *priorityLabel = new QLabel("Độ ưu tiên: " + QString::number(task.getPriority()), textContainer);
     priorityLabel->setStyleSheet("font-size: 13px; color: #2f3542; font-weight: 500; background: transparent;");
 
     QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
     QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
-
     QString deadlineStyle = "font-size: 13px; background: transparent;";
     if (task.isOverdue()) {
         deadlineStyle += " color: #e74c3c; font-weight: bold;";
@@ -287,247 +257,101 @@ void MainWindow::renderTaskItem(const Task &task) {
     textLayout->addWidget(priorityLabel);
     textLayout->addWidget(deadlineLabel);
 
-    QCheckBox *checkBox = new QCheckBox(taskItem);
-    checkBox->setStyleSheet(
-        "QCheckBox::indicator {"
-        "   width: 20px;"
-        "   height: 20px;"
-        "}"
-        );
-    checkBox->setChecked(task.getStatus() == TaskStatus::DONE);
-    checkBox->setProperty("taskId", task.getId());
+    return textContainer;
+}
 
-    connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
+QTextEdit* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent) {
+    QTextEdit *descriptionLabel = new QTextEdit(parent);
+    descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent; border: none;");
+    descriptionLabel->setWordWrapMode(QTextOption::WrapAnywhere);
+    descriptionLabel->setReadOnly(true);
+    descriptionLabel->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    descriptionLabel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    descriptionLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    descriptionLabel->document()->setDocumentMargin(0);
+    descriptionLabel->setMaximumHeight(65);
+    descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
-    QWidget *statusColorWidget = new QWidget(taskItem);
-
-    // Xác định màu sắc dựa trên trạng thái của Task
-    QString statusColor = "#95a5a6"; // Mặc định (Xám)
-    if (task.getStatus() == TaskStatus::TODO) {
-        statusColor = "#e74c3c";     // Chưa làm: Đỏ nhạt
-    } else if (task.getStatus() == TaskStatus::IN_PROGRESS) {
-        statusColor = "#f1c40f";     // Đang làm: Vàng
-    } else if (task.getStatus() == TaskStatus::DONE) {
-        statusColor = "#2ecc71";     // Hoàn thành: Xanh lá
+    QString rawDesc = desc.trimmed();
+    if (rawDesc.isEmpty()) {
+        descriptionLabel->setText("(Không có mô tả)");
+    } else {
+        int maxChars = 115;
+        if (rawDesc.length() > maxChars) {
+            descriptionLabel->setText(rawDesc.left(maxChars).trimmed() + "...");
+        } else {
+            descriptionLabel->setText(rawDesc);
+        }
     }
+    return descriptionLabel;
+}
 
-    // Định dạng Widget thành một hình tròn nhỏ (hoặc hình chữ nhật bo góc)
-    statusColorWidget->setStyleSheet(
-        QString("background-color: %1; border-radius: 6px;").arg(statusColor)
-        );
+QWidget* MainWindow::createStatusBadge(TaskStatus status, QWidget *parent) {
+    QWidget *statusColorWidget = new QWidget(parent);
+    QString statusColor = "#95a5a6";
+    if (status == TaskStatus::TODO) statusColor = "#e74c3c";
+    else if (status == TaskStatus::IN_PROGRESS) statusColor = "#f1c40f";
+    else if (status == TaskStatus::DONE) statusColor = "#2ecc71";
+
+    statusColorWidget->setStyleSheet(QString("background-color: %1; border-radius: 6px;").arg(statusColor));
     statusColorWidget->setFixedSize(12, 12);
+    return statusColorWidget;
+}
 
-    QToolButton *deleteBtn = new QToolButton(taskItem);
+QToolButton* MainWindow::createDeleteButton(int taskId, QWidget *parent) {
+    QToolButton *deleteBtn = new QToolButton(parent);
     deleteBtn->setText("🗑");
     deleteBtn->setStyleSheet(
-        "QToolButton {"
-        "   color: #e74c3c; font-size: 18px; background: transparent; border: none;"
-        "}"
-        "QToolButton:hover {"
-        "   color: #c0392b; font-size: 20px;"
-        "}"
-        );
-    deleteBtn->setProperty("taskId", task.getId());
+        "QToolButton { color: #e74c3c; font-size: 18px; background: transparent; border: none; }"
+        "QToolButton:hover { color: #c0392b; font-size: 20px; }"
+    );
+    deleteBtn->setProperty("taskId", taskId);
     connect(deleteBtn, &QToolButton::clicked, this, &MainWindow::onDeleteTaskClicked);
+    return deleteBtn;
+}
+
+QCheckBox* MainWindow::createStatusCheckBox(const Task &task, QWidget *parent) {
+    QCheckBox *checkBox = new QCheckBox(parent);
+    checkBox->setStyleSheet("QCheckBox::indicator { width: 20px; height: 20px; }");
+    checkBox->setChecked(task.getStatus() == TaskStatus::DONE);
+    checkBox->setProperty("taskId", task.getId());
+    connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
+    return checkBox;
+}
+
+void MainWindow::renderTaskItem(const Task &task) {
+    QWidget *taskItem = new QWidget(scrollContent);
+    taskItem->setObjectName("taskItem");
+    taskItem->setStyleSheet(
+        "QWidget#taskItem {"
+        "   background-color: white; border-radius: 10px;"
+        "   border: 1px solid #dcdde1; min-height: 60px;"
+        "}"
+        "QWidget#taskItem:hover {"
+        "   border: 1px solid #3498db; background-color: #f8fbfc;"
+        "}"
+    );
+
+    QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
+    taskLayout->setContentsMargins(15, 10, 15, 10);
+
+    QWidget *textContainer = createTextContainer(task, taskItem);
+    QWidget *statusBadge = createStatusBadge(task.getStatus(), taskItem);
+    QToolButton *deleteBtn = createDeleteButton(task.getId(), taskItem);
+    QCheckBox *checkBox = createStatusCheckBox(task, taskItem);
 
     taskLayout->addWidget(textContainer, 1);
     taskLayout->addStretch();
-    taskLayout->addWidget(statusColorWidget);
+    taskLayout->addWidget(statusBadge);
     taskLayout->addWidget(deleteBtn);
     taskLayout->addWidget(checkBox);
 
-    // Bắt sự kiện click vào task để mở Details
     taskItem->setProperty("taskId", task.getId());
     taskItem->setCursor(Qt::PointingHandCursor);
     taskItem->installEventFilter(this);
 
     contentLayout->addWidget(taskItem);
 }
-// void MainWindow::refreshTaskList()
-// {
-//     // Xóa tất cả các widget con trong contentLayout
-//     QLayoutItem *child;
-//     while ((child = contentLayout->takeAt(0)) != nullptr) {
-//         if (child->widget()) {
-//             delete child->widget();
-//         }
-//         delete child;
-//     }
-
-//     QList<Task> displayTasks;
-
-//     // 1. Áp dụng các bộ lọc của TaskManager để lấy danh sách phù hợp ban đầu
-//     if (currentStatusFilter == 1) {
-//         displayTasks = taskManager.filterByStatus(TaskStatus::TODO);
-//     } else if (currentStatusFilter == 2) {
-//         displayTasks = taskManager.filterByStatus(TaskStatus::IN_PROGRESS);
-//     } else if (currentStatusFilter == 3) {
-//         displayTasks = taskManager.filterByStatus(TaskStatus::DONE);
-//     } else {
-//         displayTasks = taskManager.getAllTasks();
-//     }
-
-//     // 2. Tiếp tục lọc thủ công theo Độ ưu tiên (Nếu người dùng chọn khác 0)
-//     if (currentPriorityFilter != 0) {
-//         QList<Task> tempTasks;
-//         for (const Task &task : displayTasks) {
-//             if (task.getPriority() == currentPriorityFilter) {
-//                 tempTasks.append(task);
-//             }
-//         }
-//         displayTasks = tempTasks;
-//     }
-
-//     // 3. Thực hiện Sắp xếp (Sorting) theo Deadline bằng std::sort
-//     if (currentSortOrder == 1) {
-//         // Deadline sắp tới trước (Tăng dần)
-//         std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
-//             return a.getDeadline() < b.getDeadline();
-//         });
-//     } else if (currentSortOrder == 2) {
-//         // Deadline xa nhất trước (Giảm dần)
-//         std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
-//             return a.getDeadline() > b.getDeadline();
-//         });
-//     }
-
-//     for (const Task &task : displayTasks) {
-//         QWidget *taskItem = new QWidget(scrollContent);
-//         taskItem->setObjectName("taskItem");
-//         taskItem->setStyleSheet(
-//             "QWidget#taskItem {"
-//             "   background-color: white;"
-//             "   border-radius: 10px;"
-//             "   border: 1px solid #dcdde1;"
-//             "   min-height: 60px;"
-//             "}"
-//             "QWidget#taskItem:hover {"
-//             "   border: 1px solid #3498db;"
-//             "   background-color: #f8fbfc;"
-//             "}"
-//         );
-//         taskItem->setFixedHeight(160);
-
-//         QHBoxLayout *taskLayout = new QHBoxLayout(taskItem);
-//         taskLayout->setContentsMargins(15, 10, 15, 10);
-
-//         QWidget *textContainer = new QWidget(taskItem);
-//         QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
-//         textLayout->setContentsMargins(0, 0, 0, 0);
-//         textLayout->setSpacing(5);
-
-//         QLabel *nameLabel = new QLabel(task.getTitle(), textContainer);
-//         QString textStyle = "color: #2c3e50; font-size: 18px; font-weight: bold; background: transparent;";
-//         if (task.getStatus() == TaskStatus::DONE) {
-//             textStyle += " text-decoration: line-through; color: #95a5a6;";
-//         }
-//         nameLabel->setStyleSheet(textStyle);
-
-//         // ⭐ 2. DÒNG MÔ TẢ: Sử dụng QTextEdit thay vì QLabel để hỗ trợ bẻ từ liên tục (WrapAnywhere)
-//         QTextEdit *descriptionLabel = new QTextEdit(textContainer);
-//         descriptionLabel->setStyleSheet("font-size: 14px; color: #57606f; background: transparent; border: none;");
-//         descriptionLabel->setWordWrapMode(QTextOption::WrapAnywhere); // Cắt từ ở bất kỳ đâu
-//         descriptionLabel->setReadOnly(true);
-//         descriptionLabel->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-//         descriptionLabel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-//         descriptionLabel->setAttribute(Qt::WA_TransparentForMouseEvents); // Cho phép click xuyên qua để mở TaskDialog
-//         descriptionLabel->document()->setDocumentMargin(0);
-
-//         // Dùng tối đa (Maximum) thay vì cố định (Fixed) giúp triệt tiêu khoảng trống thừa khi mô tả ngắn
-//         descriptionLabel->setMaximumHeight(65);
-//         descriptionLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-
-//         QString rawDesc = task.getDescription().trimmed();
-//         if (rawDesc.isEmpty()) {
-//             descriptionLabel->setText("(Không có mô tả)");
-//         } else {
-//             // Giới hạn số lượng ký tự để đảm bảo text tối đa 3 dòng và luôn xuất hiện dấu "..."
-//             int maxChars = 115;
-//             if (rawDesc.length() > maxChars) {
-//                 QString shortDesc = rawDesc.left(maxChars).trimmed() + "...";
-//                 descriptionLabel->setText(shortDesc);
-//             } else {
-//                 descriptionLabel->setText(rawDesc);
-//             }
-//         }
-
-//         // 3. Dòng Mức độ ưu tiên (Mới thêm)
-//         QLabel *priorityLabel = new QLabel("Độ ưu tiên: " + QString::number(task.getPriority()), textContainer);
-//         priorityLabel->setStyleSheet("font-size: 13px; color: #2f3542; font-weight: 500; background: transparent;");
-
-//         QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
-//         QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
-
-//         QString deadlineStyle = "font-size: 13px; background: transparent;";
-//         if (task.isOverdue()) {
-//             deadlineStyle += " color: #e74c3c; font-weight: bold;";
-//         } else {
-//             deadlineStyle += " color: #7f8c8d;";
-//         }
-//         deadlineLabel->setStyleSheet(deadlineStyle);
-
-//         textLayout->addWidget(nameLabel);
-//         textLayout->addWidget(descriptionLabel);
-//         textLayout->addWidget(priorityLabel);
-//         textLayout->addWidget(deadlineLabel);
-
-//         QCheckBox *checkBox = new QCheckBox(taskItem);
-//         checkBox->setStyleSheet(
-//             "QCheckBox::indicator {"
-//             "   width: 20px;"
-//             "   height: 20px;"
-//             "}"
-//         );
-//         checkBox->setChecked(task.getStatus() == TaskStatus::DONE);
-//         checkBox->setProperty("taskId", task.getId());
-
-//         connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onTaskStatusChanged);
-
-//         QWidget *statusColorWidget = new QWidget(taskItem);
-
-//         // Xác định màu sắc dựa trên trạng thái của Task
-//         QString statusColor = "#95a5a6"; // Mặc định (Xám)
-//         if (task.getStatus() == TaskStatus::TODO) {
-//             statusColor = "#e74c3c";     // Chưa làm: Đỏ nhạt
-//         } else if (task.getStatus() == TaskStatus::IN_PROGRESS) {
-//             statusColor = "#f1c40f";     // Đang làm: Vàng
-//         } else if (task.getStatus() == TaskStatus::DONE) {
-//             statusColor = "#2ecc71";     // Hoàn thành: Xanh lá
-//         }
-
-//         // Định dạng Widget thành một hình tròn nhỏ (hoặc hình chữ nhật bo góc)
-//         statusColorWidget->setStyleSheet(
-//             QString("background-color: %1; border-radius: 6px;").arg(statusColor)
-//             );
-//         statusColorWidget->setFixedSize(12, 12);
-
-//         QToolButton *deleteBtn = new QToolButton(taskItem);
-//         deleteBtn->setText("🗑");
-//         deleteBtn->setStyleSheet(
-//             "QToolButton {"
-//             "   color: #e74c3c; font-size: 18px; background: transparent; border: none;"
-//             "}"
-//             "QToolButton:hover {"
-//             "   color: #c0392b; font-size: 20px;"
-//             "}"
-//         );
-//         deleteBtn->setProperty("taskId", task.getId());
-//         connect(deleteBtn, &QToolButton::clicked, this, &MainWindow::onDeleteTaskClicked);
-
-//         taskLayout->addWidget(textContainer, 1);
-//         taskLayout->addStretch();
-//         taskLayout->addWidget(statusColorWidget);
-//         taskLayout->addWidget(deleteBtn);
-//         taskLayout->addWidget(checkBox);
-
-//         // Bắt sự kiện click vào task để mở Details
-//         taskItem->setProperty("taskId", task.getId());
-//         taskItem->setCursor(Qt::PointingHandCursor);
-//         taskItem->installEventFilter(this);
-
-//         contentLayout->addWidget(taskItem);
-//     }
-// }
 
 void MainWindow::onTaskStatusChanged(int state)
 {
@@ -535,7 +359,7 @@ void MainWindow::onTaskStatusChanged(int state)
     if (senderCb) {
         int taskId = senderCb->property("taskId").toInt();
         QList<Task> allTasks = taskManager.getAllTasks();
-        Task targetTask = allTasks.first(); // Fallback
+        Task targetTask = allTasks.first(); 
         
         for (const Task &t : allTasks) {
             if (t.getId() == taskId) {
@@ -546,10 +370,23 @@ void MainWindow::onTaskStatusChanged(int state)
         
         if (state == Qt::Checked) {
             taskManager.markTaskDone(taskId);
+            targetTask.setStatus(TaskStatus::DONE);
         } else {
             taskManager.editTask(taskId, targetTask.getTitle(), targetTask.getDescription(), TaskStatus::TODO, targetTask.getPriority(), targetTask.getDeadline());
+            targetTask.setStatus(TaskStatus::TODO);
         }
         taskManager.saveToFile(dataFilePath);
+
+        // API Sync
+        TaskStats ts;
+        ts.id = targetTask.getId();
+        ts.title = targetTask.getTitle();
+        ts.description = targetTask.getDescription();
+        ts.status = targetTask.getStatus();
+        ts.priority = targetTask.getPriority();
+        ts.deadline = targetTask.getDeadline();
+        APIService::instance().updateTask(ts, [](bool, QJsonArray){});
+
         refreshTaskList();
     }
 }
@@ -561,6 +398,10 @@ void MainWindow::onDeleteTaskClicked()
         int taskId = senderBtn->property("taskId").toInt();
         taskManager.deleteTask(taskId);
         taskManager.saveToFile(dataFilePath);
+
+        // API Sync
+        APIService::instance().deleteTask(taskId, [](bool, QJsonArray){});
+
         refreshTaskList();
     }
 }
@@ -569,6 +410,23 @@ void MainWindow::onUndoTaskClicked()
 {
     taskManager.undoDelete();
     taskManager.saveToFile(dataFilePath);
+
+    // API Sync - Undo deletes the most recently deleted task from local trash
+    // We get the restored task from the manager to send to API
+    QList<Task> all = taskManager.getAllTasks();
+    if (!all.isEmpty()) {
+        // Giả sử Task vừa Undo được push vào cuối (theo cơ chế m_tasks của TaskManager)
+        Task targetTask = all.last();
+        TaskStats ts;
+        ts.id = targetTask.getId();
+        ts.title = targetTask.getTitle();
+        ts.description = targetTask.getDescription();
+        ts.status = targetTask.getStatus();
+        ts.priority = targetTask.getPriority();
+        ts.deadline = targetTask.getDeadline();
+        APIService::instance().createNewTask(ts, [](bool, QJsonArray){});
+    }
+
     refreshTaskList();
 }
 
@@ -601,6 +459,17 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                             dialog.getDeadline()
                             );
                         taskManager.saveToFile(dataFilePath);
+
+                        // API Sync
+                        TaskStats ts;
+                        ts.id = taskId;
+                        ts.title = dialog.getTitle();
+                        ts.description = dialog.getDescription();
+                        ts.status = dialog.getStatus();
+                        ts.priority = dialog.getPriority();
+                        ts.deadline = dialog.getDeadline();
+                        APIService::instance().updateTask(ts, [](bool, QJsonArray){});
+
                         refreshTaskList();
                     }
                     break;

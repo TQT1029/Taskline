@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <Qwidget>
 #include <QLabel>
+#include <QTextEdit>
 #include <QPushButton>
 #include <QToolButton>
 #include <QScrollArea>
@@ -31,13 +32,20 @@ protected:
 private:
     void setupUI();
     void initData();
+    void clearLayout(QLayout *layout);
+    QList<Task> getFilteredAndSortedTasks();
+    void renderTaskItem(const Task &task);
+    
+    // UI Helpers cho renderTaskItem
+    QWidget* createTextContainer(const Task &task, QWidget *parent);
+    QTextEdit* createDescriptionLabel(const QString &desc, QWidget *parent);
+    QWidget* createStatusBadge(TaskStatus status, QWidget *parent);
+    QToolButton* createDeleteButton(int taskId, QWidget *parent);
+    QCheckBox* createStatusCheckBox(const Task &task, QWidget *parent);
 
 private slots:
     void addNewTask();
     void refreshTaskList();
-    void clearLayout(QLayout *layout);
-    QList<Task> getFilteredAndSortedTasks();
-    void renderTaskItem(const Task &task);
     void onTaskStatusChanged(int state);
     void openTaskDetails();
     void onDeleteTaskClicked();
