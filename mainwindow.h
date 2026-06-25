@@ -35,6 +35,9 @@ private:
 private slots:
     void addNewTask();
     void refreshTaskList();
+    void clearLayout(QLayout *layout);
+    QList<Task> getFilteredAndSortedTasks();
+    void renderTaskItem(const Task &task);
     void onTaskStatusChanged(int state);
     void openTaskDetails();
     void onDeleteTaskClicked();
