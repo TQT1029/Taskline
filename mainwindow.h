@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <Qwidget>
 #include <QLabel>
+#include <QTextEdit>
 #include <QPushButton>
 #include <QToolButton>
 #include <QScrollArea>
@@ -27,6 +28,19 @@ public:
     
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+private:
+    void setupUI();
+    void initData();
+    void clearLayout(QLayout *layout);
+    QList<Task> getFilteredAndSortedTasks();
+    void renderTaskItem(const Task &task);
+    
+    QWidget* createTextContainer(const Task &task, QWidget *parent);
+    QLabel* createDescriptionLabel(const QString &desc, QWidget *parent);
+    QWidget* createStatusBadge(TaskStatus status, QWidget *parent);
+    QToolButton* createDeleteButton(QString taskId, QWidget *parent);
+    QCheckBox* createStatusCheckBox(const Task &task, QWidget *parent);
 
 private slots:
     void addNewTask();

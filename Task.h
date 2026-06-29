@@ -3,26 +3,16 @@
 
 #include <QDateTime>
 #include <QString>
-
-enum class TaskStatus {
-    TODO,
-    IN_PROGRESS,
-    DONE
-};
+#include "TaskStats.h"
 
 class Task
 {
 private:
-    int id;
-    QString title;
-    QString description;
-    TaskStatus status;
-    int priority;   // Độ ưu tiên
-    QDateTime deadline;
+    TaskStats taskStats;
 
 public:
     // Constructor
-    Task(int id,
+    Task(QString id,
          const QString &title,
          const QString &description,
          TaskStatus status,
@@ -30,7 +20,7 @@ public:
          const QDateTime &deadline);
 
     // Các hàm Getters
-    int getId() const;
+    QString getId() const;
     QString getTitle() const;
     QString getDescription() const;
     TaskStatus getStatus() const;
