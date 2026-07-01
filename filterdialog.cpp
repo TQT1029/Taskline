@@ -1,8 +1,9 @@
 #include "filterdialog.h"
+#include "ThemeUtils.h"
 
 FilterDialog::FilterDialog(int initStatus, int initPriority, int initSort, QWidget *parent)
     : QDialog(parent)
-{
+{   
     setWindowTitle("Bộ lọc & Sắp xếp");
     setMinimumWidth(340);
     setContentsMargins(20, 20, 20, 20);

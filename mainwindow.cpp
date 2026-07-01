@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <algorithm>
 #include <QTextEdit>
+#include <qjsonobject.h>
 #include "taskdialog.h"
 #include "ThemeUtils.h"
 
@@ -158,11 +159,14 @@ void MainWindow::addNewTask()
             ts.priority = dialog.getPriority();
             ts.deadline = dialog.getDeadline();
             
+            // Cấp phát ID tạm cho task trước khi nhận ID từ server
             int tempId = targetTask.getId();
             
             APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject obj){
                 if (success && !obj.isEmpty()) {
                     int serverId = 0;
+
+
                     if (obj.contains("id") || obj.contains("ID")) {
                         QJsonValue idVal = obj.contains("id") ? obj["id"] : obj["ID"];
                         serverId = idVal.isString() ? idVal.toString().toInt() : idVal.toInt();

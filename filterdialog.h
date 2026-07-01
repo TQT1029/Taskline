@@ -7,12 +7,11 @@
 #include <QFormLayout>
 #include <QPushButton>
 #include <QHBoxLayout>
-#include "ThemeUtils.h"
 
 class FilterDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit FilterDialog(int initStatus, int initPriority, int initSort, QWidget *parent = nullptr);
+    explicit FilterDialog(int initStatus = 0, int initPriority = 0, int initSort = 0, QWidget *parent = nullptr);
 
     int getSelectedStatus() const;
     int getSelectedPriority() const;

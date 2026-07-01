@@ -49,6 +49,7 @@ private slots:
     void openTaskDetails();
     void onDeleteTaskClicked();
     void onUndoTaskClicked();
+    void onMenuButtonClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -72,6 +73,10 @@ private:
 
     TaskManager taskManager;
     QString dataFilePath;
+    
+    int currentStatusFilter = 0;
+    int currentPriorityFilter = 0;
+    int currentSortOrder = 0;
 };
 
 #endif // MAINWINDOW_H
