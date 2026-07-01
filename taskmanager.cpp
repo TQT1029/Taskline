@@ -3,17 +3,18 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
-#include <QUuid>
+
 #include <algorithm>
 
 TaskManager::TaskManager() {}
 
 void TaskManager::addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
-    QString id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    static int tempIdCounter = -1;
+    int id = tempIdCounter--;
     tasks.append(Task(id, title, description, status, priority, deadline));
 }
 
-bool TaskManager::editTask(QString id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
+bool TaskManager::editTask(int id, const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
     for (auto &task : tasks) {
         if (task.getId() == id) {
             task = Task(id, title, description, status, priority, deadline);
@@ -23,7 +24,17 @@ bool TaskManager::editTask(QString id, const QString &title, const QString &desc
     return false;
 }
 
-bool TaskManager::deleteTask(QString id) {
+bool TaskManager::updateTaskId(int oldId, int newId) {
+    for (auto &task : tasks) {
+        if (task.getId() == oldId) {
+            task.setId(newId);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool TaskManager::deleteTask(int id) {
     for (int i = 0; i < tasks.size(); ++i) {
         if (tasks[i].getId() == id) {
             undoStack.push(tasks[i]);
@@ -34,7 +45,7 @@ bool TaskManager::deleteTask(QString id) {
     return false;
 }
 
-bool TaskManager::markTaskDone(QString id) {
+bool TaskManager::markTaskDone(int id) {
     for (auto &task : tasks) {
         if (task.getId() == id) {
             task.setStatus(TaskStatus::DONE);
@@ -175,11 +186,11 @@ bool TaskManager::loadFromFile(const QString &filePath) {
     for (const auto &val : jsonArray) {
         QJsonObject taskObj = val.toObject();
         
-        QString id;
-        if (taskObj["id"].isString()) {
-            id = taskObj["id"].toString();
-        } else if (taskObj["id"].isDouble()) {
-            id = QString::number(taskObj["id"].toInt());
+        int id = 0;
+        if (taskObj["id"].isDouble()) {
+            id = taskObj["id"].toInt();
+        } else if (taskObj["id"].isString()) {
+            id = taskObj["id"].toString().toInt();
         }
 
         QString title = taskObj["title"].toString();

@@ -12,7 +12,7 @@ private:
 
 public:
     // Constructor
-    Task(QString id,
+    Task(int id,
          const QString &title,
          const QString &description,
          TaskStatus status,
@@ -20,7 +20,7 @@ public:
          const QDateTime &deadline);
 
     // Các hàm Getters
-    QString getId() const;
+    int getId() const;
     QString getTitle() const;
     QString getDescription() const;
     TaskStatus getStatus() const;
@@ -28,6 +28,7 @@ public:
     QDateTime getDeadline() const;
 
     // Các hàm Setters / Logic khác
+    void setId(int newId);
     void setTitle(QString title);
     void setDescription(QString description);
     void setStatus(TaskStatus newStatus);

@@ -44,7 +44,7 @@ private:
     QWidget* createTextContainer(const Task &task, QWidget *parent);
     QLabel* createDescriptionLabel(const QString &desc, QWidget *parent);
     QWidget* createStatusBadge(TaskStatus status, QWidget *parent);
-    QToolButton* createDeleteButton(QString taskId, QWidget *parent);
+    QToolButton* createDeleteButton(int taskId, QWidget *parent);
     QCheckBox* createStatusCheckBox(const Task &task, QWidget *parent);
 
 private slots:
@@ -54,6 +54,7 @@ private slots:
     void openTaskDetails();
     void onDeleteTaskClicked();
     void onUndoTaskClicked();
+    void onMenuButtonClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -80,6 +81,10 @@ private:
 
     TaskManager taskManager;
     QString dataFilePath;
+    
+    int currentStatusFilter = 0;
+    int currentPriorityFilter = 0;
+    int currentSortOrder = 0;
 };
 
 #endif // MAINWINDOW_H
