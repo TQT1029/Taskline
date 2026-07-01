@@ -39,6 +39,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ThemeUtils.h
         check.png
         Res.qrc
+        taskstatusbar.h
+        tasksearch.h
+        tasknotifier.h
 
     )
 # Define target properties for Android with Qt 6 as:

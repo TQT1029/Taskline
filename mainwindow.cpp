@@ -9,6 +9,9 @@
 #include <QTextEdit>
 #include "taskdialog.h"
 #include "ThemeUtils.h"
+#include "taskstatusbar.h"
+#include "tasksearch.h"
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -68,8 +71,15 @@ void MainWindow::setupUI()
                                   ).arg(ThemeUtils::textMain()));
 
     topBarLayout->addWidget(menuButton); 
-    topBarLayout->addWidget(titleLabel); 
+    topBarLayout->addWidget(titleLabel);
+
     topBarLayout->addStretch();
+
+    taskSearch.setupInWidget(topBar);
+    topBarLayout->addWidget(taskSearch.searchButton);
+    topBarLayout->addWidget(taskSearch.searchEdit);
+
+    connect(&taskSearch, &TaskSearchHelper::searchRequested, this, &MainWindow::refreshTaskList);
 
     // 4. Khởi tạo nút + New
     newButton = new QPushButton("+ New", topBar);
@@ -114,13 +124,29 @@ void MainWindow::setupUI()
                                   "}"
                                   "QPushButton:hover { background-color: %4; }"
                                   ).arg(ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::border(), ThemeUtils::btnSecondaryHover()));
-    bottomBarLayout->addStretch();
+    taskTracker.setupInWidget(bottomBar);
+    bottomBarLayout->addWidget(taskTracker.statusLabel);
+    bottomBarLayout->addWidget(taskTracker.progressBar);
+
+    bottomBarLayout->addSpacing(15);
+
     bottomBarLayout->addWidget(undoButton);
 
     // Ghép Layout
     mainLayout->addWidget(topBar, 0);      
     mainLayout->addWidget(scrollArea, 1);
     mainLayout->addWidget(bottomBar, 0);
+
+    notifier = new TaskNotifier(this);
+
+    QTimer *systemTimer = new QTimer(this);
+    connect(systemTimer, &QTimer::timeout, this, [this]() {
+        if (notifier) {
+            // Lấy danh sách task tươi mới nhất từ manager để ép quét
+            notifier->checkDeadlines(taskManager.getAllTasks());
+        }
+    });
+    systemTimer->start(10000); // Khởi động quét 10 giây/lần
 }
 
 void MainWindow::initData()
@@ -171,9 +197,18 @@ void MainWindow::refreshTaskList() {
 
     QList<Task> finalTasks = getFilteredAndSortedTasks();
 
+    QString keyword = taskSearch.searchEdit ? taskSearch.searchEdit->text().trimmed() : "";
+
+    finalTasks = getFilteredAndSortedTasks();
+
     for (const Task &task : finalTasks) {
-        renderTaskItem(task);
+        // CHỈ VẼ RA MÀN HÌNH NẾU: Ô search trống HOẶC Tiêu đề/Mô tả có chứa từ khóa
+        if (keyword.isEmpty() || task.getTitle().contains(keyword, Qt::CaseInsensitive)  //
+            || task.getDescription().contains(keyword, Qt::CaseInsensitive)) { //
+            renderTaskItem(task); //
+        }
     }
+    taskTracker.updateStatistics(taskManager.getAllTasks());
 }
 
 void MainWindow::clearLayout(QLayout *layout) {
@@ -270,7 +305,7 @@ QLabel* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent)
         if (displayDesc.length() > maxChars) {
             displayDesc = displayDesc.left(maxChars).trimmed() + "...";
         }
-        
+
         // Chèn zero-width space (\u200B) để QLabel có thể tự do wrap/break-word
         // đối với các chuỗi dài liên tục không có dấu cách (như "awwwgydgyddd...")
         // mà vẫn giữ nguyên khả năng co giãn chiều cao (auto-scale height).
@@ -512,5 +547,25 @@ void MainWindow::onMenuButtonClicked()
 
         // Làm mới lại danh sách hiển thị với bộ lọc mới
         refreshTaskList();
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // Nếu icon khay hệ thống (System Tray) đang hoạt động
+    if (notifier) {
+        this->hide(); // Ẩn cửa sổ chính đi thay vì tắt hẳn
+
+        // Gửi thông báo cho người dùng biết ứng dụng đã được thu nhỏ xuống khay hệ thống
+        notifier->sendNotification(
+            "Taskline vẫn đang chạy ngầm",
+            "Ứng dụng đã được thu nhỏ xuống khay hệ thống để tiếp tục theo dõi deadline.",
+            QSystemTrayIcon::Information,
+            2000
+            );
+
+        event->ignore(); // Chặn sự kiện tắt ứng dụng (không cho quit)
+    } else {
+        event->accept(); // Nếu không có notifier, cho phép tắt ứng dụng bình thường
     }
 }
