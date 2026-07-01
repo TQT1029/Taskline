@@ -12,6 +12,8 @@
 #include "taskstatusbar.h"
 #include "tasksearch.h"
 #include <QCloseEvent>
+#include "taskdeadline.h"
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -164,16 +166,18 @@ void MainWindow::addNewTask()
 {
     TaskDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
+        // Lấy dữ liệu thời gian trực tiếp từ Dialog do người dùng chọn
+        QDateTime userDateTime = dialog.getDeadline().getDateTime();
+
         taskManager.addTask(
             dialog.getTitle(),
             dialog.getDescription(),
             dialog.getStatus(),
             dialog.getPriority(),
-            dialog.getDeadline()
+            userDateTime
             );
         taskManager.saveToFile(dataFilePath);
 
-        // Lấy task vừa tạo (nằm cuối cùng trong danh sách)
         QList<Task> all = taskManager.getAllTasks();
         if (!all.isEmpty()) {
             TaskStats ts;
@@ -182,12 +186,14 @@ void MainWindow::addNewTask()
             ts.description = dialog.getDescription();
             ts.status = dialog.getStatus();
             ts.priority = dialog.getPriority();
-            ts.deadline = dialog.getDeadline();
+            ts.deadline = userDateTime; // Đồng bộ mốc thời gian thực tế lên Server API
+
             APIService::instance().createNewTask(ts, [](bool success, QJsonArray data){
-                // Xử lý khi API phản hồi (không bắt buộc vì dùng local làm chính hiện tại)
+                Q_UNUSED(success);
+                Q_UNUSED(data);
             });
         }
-        
+
         refreshTaskList();
     }
 }
@@ -272,10 +278,14 @@ QWidget* MainWindow::createTextContainer(const Task &task, QWidget *parent) {
     QLabel *priorityLabel = new QLabel("Độ ưu tiên: " + QString::number(task.getPriority()), textContainer);
     priorityLabel->setStyleSheet(QString("font-size: 13px; color: %1; font-weight: 500; background: transparent;").arg(ThemeUtils::textSub()));
 
-    QString dtStr = task.getDeadline().toString("dd/MM/yyyy hh:mm");
+    // Sử dụng class bọc TaskDeadline để xử lý chuỗi và kiểm tra logic quá hạn
+    TaskDeadline deadlineWrapper(task.getDeadline());
+
+    QString dtStr = deadlineWrapper.toString("dd/MM/yyyy hh:mm");
     QLabel *deadlineLabel = new QLabel("Deadline: " + dtStr, textContainer);
     QString deadlineStyle = "font-size: 13px; background: transparent;";
-    if (task.isOverdue()) {
+
+    if (deadlineWrapper.isOverdue(task.statusToString(task.getStatus()))) {
         deadlineStyle += " color: #e74c3c; font-weight: bold;";
     } else {
         deadlineStyle += QString(" color: %1;").arg(ThemeUtils::textSub());
@@ -413,20 +423,28 @@ void MainWindow::onTaskStatusChanged(int state)
     if (senderCb) {
         QString taskId = senderCb->property("taskId").toString();
         QList<Task> allTasks = taskManager.getAllTasks();
-        Task targetTask = allTasks.first(); 
-        
+        Task targetTask = allTasks.first();
+
         for (const Task &t : allTasks) {
             if (t.getId() == taskId) {
                 targetTask = t;
                 break;
             }
         }
-        
+
         if (state == Qt::Checked) {
             taskManager.markTaskDone(taskId);
             targetTask.setStatus(TaskStatus::DONE);
         } else {
-            taskManager.editTask(taskId, targetTask.getTitle(), targetTask.getDescription(), TaskStatus::TODO, targetTask.getPriority(), targetTask.getDeadline());
+            // Giữ nguyên targetTask.getDeadline() trả về QDateTime thuần của Qt
+            taskManager.editTask(
+                taskId,
+                targetTask.getTitle(),
+                targetTask.getDescription(),
+                TaskStatus::TODO,
+                targetTask.getPriority(),
+                targetTask.getDeadline()
+                );
             targetTask.setStatus(TaskStatus::TODO);
         }
         taskManager.saveToFile(dataFilePath);
@@ -438,7 +456,8 @@ void MainWindow::onTaskStatusChanged(int state)
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
         ts.priority = targetTask.getPriority();
-        ts.deadline = targetTask.getDeadline();
+        ts.deadline = targetTask.getDeadline(); // Gán trực tiếp QDateTime thuần sang struct API
+
         APIService::instance().updateTask(ts, [](bool, QJsonArray){});
 
         refreshTaskList();
@@ -465,11 +484,9 @@ void MainWindow::onUndoTaskClicked()
     taskManager.undoDelete();
     taskManager.saveToFile(dataFilePath);
 
-    // API Sync - Undo deletes the most recently deleted task from local trash
-    // We get the restored task from the manager to send to API
+    // API Sync - Khôi phục task bị xóa gần nhất
     QList<Task> all = taskManager.getAllTasks();
     if (!all.isEmpty()) {
-        // Giả sử Task vừa Undo được push vào cuối (theo cơ chế m_tasks của TaskManager)
         Task targetTask = all.last();
         TaskStats ts;
         ts.id = targetTask.getId();
@@ -477,7 +494,8 @@ void MainWindow::onUndoTaskClicked()
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
         ts.priority = targetTask.getPriority();
-        ts.deadline = targetTask.getDeadline();
+        ts.deadline = targetTask.getDeadline(); // Sử dụng trực tiếp dữ liệu QDateTime của Task gốc
+
         APIService::instance().createNewTask(ts, [](bool, QJsonArray){});
     }
 
@@ -490,27 +508,29 @@ void MainWindow::openTaskDetails()
     // Mặc dù eventFilter xử lý, nhưng để gọi được slot cần gán tín hiệu hoặc gọi trực tiếp từ filter.
 }
 
-// Bổ sung hàm eventFilter cho MainWindow (cần khai báo override trong .h)
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonRelease) {
         QWidget *widget = qobject_cast<QWidget*>(watched);
         if (widget && widget->property("taskId").isValid()) {
             QString taskId = widget->property("taskId").toString();
-            
+
             QList<Task> allTasks = taskManager.getAllTasks();
             for (const Task &t : allTasks) {
                 if (t.getId() == taskId) {
                     TaskDialog dialog(this);
                     dialog.setTaskData(t);
                     if (dialog.exec() == QDialog::Accepted) {
+                        // Cập nhật mốc thời gian mới từ ô nhập liệu sau khi nhấn Save
+                        QDateTime updatedDateTime = dialog.getDeadline().getDateTime();
+
                         taskManager.editTask(
                             taskId,
                             dialog.getTitle(),
                             dialog.getDescription(),
                             dialog.getStatus(),
                             dialog.getPriority(),
-                            dialog.getDeadline()
+                            updatedDateTime
                             );
                         taskManager.saveToFile(dataFilePath);
 
@@ -521,7 +541,8 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                         ts.description = dialog.getDescription();
                         ts.status = dialog.getStatus();
                         ts.priority = dialog.getPriority();
-                        ts.deadline = dialog.getDeadline();
+                        ts.deadline = updatedDateTime; // Đồng bộ mốc thời gian cập nhật mới lên API
+
                         APIService::instance().updateTask(ts, [](bool, QJsonArray){});
 
                         refreshTaskList();

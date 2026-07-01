@@ -6,12 +6,12 @@
 #include <QTextEdit>
 #include <QComboBox>
 #include <QSpinBox>
-#include <QDateTimeEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include "task.h"
+#include "taskdeadline.h"
 
 class TaskDialog : public QDialog
 {
@@ -22,7 +22,7 @@ public:
 
     // Cài đặt dữ liệu cho View/Edit mode
     void setTaskData(const Task &task);
-    
+
     // Thiết lập khóa/mở khóa nhập liệu
     void setEditMode(bool editable);
     bool isEditable() const;
@@ -31,7 +31,7 @@ public:
     QString getDescription() const;
     TaskStatus getStatus() const;
     int getPriority() const;
-    QDateTime getDeadline() const;
+    TaskDeadline getDeadline() const;
 
 private slots:
     void toggleEditMode();
@@ -43,7 +43,7 @@ private:
     QTextEdit *descInput;
     QComboBox *statusInput;
     QSpinBox *priorityInput;
-    QDateTimeEdit *deadlineInput;
+    DeadlineSelectorWidget *deadlineInput;
 
     QPushButton *btnLockToggle;
     QPushButton *btnSave;

@@ -7,31 +7,31 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QSet>
-#include <QMenu>        // Thêm thư viện quản lý Menu thả xuống
-#include <QAction>      // Thêm thư viện quản lý nút bấm trong Menu
-#include <QApplication> // Thêm thư viện để gọi lệnh tắt hẳn App
-#include "task.h"       //
+#include <QMenu>
+#include <QAction>
+#include <QApplication>
+#include "task.h"
 #include <QDebug>
 
 class TaskNotifier : public QObject {
     Q_OBJECT
 private:
-    QSystemTrayIcon *trayIcon = nullptr; //
-    QTimer *checkTimer = nullptr; //
-    QMenu *trayMenu = nullptr;     // Menu xuất hiện khi click chuột phải
-    QAction *closeAction = nullptr; // Nút bấm "Thoát" nằm trong Menu
+    QSystemTrayIcon *trayIcon = nullptr;
+    QTimer *checkTimer = nullptr;
+    QMenu *trayMenu = nullptr;
+    QAction *closeAction = nullptr;
 
-    QSet<QString> notifiedOverdueTasks; //
-    QSet<QString> notifiedUrgentTasks; //
+    QSet<QString> notifiedOverdueTasks;
+    QSet<QString> notifiedUrgentTasks;
+    QSet<QString> notifiedOneHourWarningTasks; // THÊM MỚI: Bộ nhớ cache lưu các task đã báo trước 1 tiếng
 
 public:
-    inline explicit TaskNotifier(QObject *parent = nullptr) : QObject(parent) { //
-        trayIcon = new QSystemTrayIcon(parent); //
-        trayIcon->setIcon(QIcon(":/Assets/icons/check.png")); //
+    inline explicit TaskNotifier(QObject *parent = nullptr) : QObject(parent) {
+        trayIcon = new QSystemTrayIcon(parent);
+        trayIcon->setIcon(QIcon(":/Assets/icons/check.png"));
 
         // --- 1. THIẾT LẬP MENU CHUỘT PHẢI CHO ICON CHẠY NGẦM ---
         trayMenu = new QMenu();
-        // Định dạng style cho menu nhìn hiện đại, chữ to rõ ràng
         trayMenu->setStyleSheet(
             "QMenu {"
             "   background-color: #ffffff; border: 1px solid #dcdcdc;"
@@ -41,58 +41,48 @@ public:
             "   padding: 6px 20px; font-size: 13px; color: #333333; border-radius: 4px;"
             "}"
             "QMenu::item:selected {"
-            "   background-color: #e74c3c; color: #ffffff;" // Di chuột vào nút Close sẽ có màu đỏ cảnh báo
+            "   background-color: #e74c3c; color: #ffffff;"
             "}"
             );
 
-        // Tạo nút "Thoát ứng dụng"
         closeAction = new QAction("Thoát hoàn toàn", this);
         trayMenu->addAction(closeAction);
-
-        // Gắn Menu này vào Icon khay hệ thống
         trayIcon->setContextMenu(trayMenu);
 
         // --- 2. XỬ LÝ SỰ KIỆN KHI BẤM NÚT THOÁT ---
         connect(closeAction, &QAction::triggered, this, []() {
-            // Lệnh tối cao tắt ứng dụng ngay lập tức, bỏ qua mọi closeEvent chắn đường
             QApplication::quit();
         });
 
         // --- 3. CLICK TRÁI HOẶC CLICK ĐÚP ĐỂ HIỆN LẠI APP ---
-        connect(trayIcon, &QSystemTrayIcon::activated, this, [parent](QSystemTrayIcon::ActivationReason reason) { //
-            if (reason == QSystemTrayIcon::DoubleClick || reason == QSystemTrayIcon::Trigger) { //
-                QWidget *mainWindow = qobject_cast<QWidget*>(parent); //
-                if (mainWindow) { //
-                    mainWindow->show(); //
-                    mainWindow->raise(); //
-                    mainWindow->activateWindow(); //
+        connect(trayIcon, &QSystemTrayIcon::activated, this, [parent](QSystemTrayIcon::ActivationReason reason) {
+            if (reason == QSystemTrayIcon::DoubleClick || reason == QSystemTrayIcon::Trigger) {
+                QWidget *mainWindow = qobject_cast<QWidget*>(parent);
+                if (mainWindow) {
+                    mainWindow->show();
+                    mainWindow->raise();
+                    mainWindow->activateWindow();
                 }
             }
         });
 
-        trayIcon->show(); //
-
-        // Khởi tạo bộ quét ngầm tự động chạy
-        // checkTimer = new QTimer(this); //
-        // checkTimer->setInterval(10000); //
-        // checkTimer->start(); //
+        trayIcon->show();
     }
 
     // Hàm bắn thông báo thủ công
     inline void sendNotification(const QString &title, const QString &message,
                                  QSystemTrayIcon::MessageIcon iconType = QSystemTrayIcon::Information,
-                                 int durationMs = 3000) { //
+                                 int durationMs = 3000) {
         qDebug() << "[NOTIFICATION TRIGGERED] Cửa sổ thông báo xuất hiện -> Title:" << title << "| Message:" << message;
 
-        if (trayIcon && QSystemTrayIcon::supportsMessages()) { //
-            trayIcon->showMessage(title, message, iconType, durationMs); //
+        if (trayIcon && QSystemTrayIcon::supportsMessages()) {
+            trayIcon->showMessage(title, message, iconType, durationMs);
         }
     }
 
     // Hàm tự động quét deadline
     inline void checkDeadlines(const QList<Task> &allTasks) {
-        // Lấy thời gian hiện tại và ép chắc chắn về Local Time
-        QDateTime now = QDateTime::currentDateTime().toLocalTime();
+        QDateTime now = QDateTime::currentDateTime();
 
         qDebug() << "[TIMER] Đang quét kiểm tra các task ngầm lúc:" << now.toString("hh:mm:ss");
 
@@ -100,40 +90,49 @@ public:
             if (task.getStatus() == TaskStatus::DONE) continue;
             QString taskId = task.getId();
 
-            // ÉP DEADLINE CỦA TASK VỀ CÙNG HỆ LOCAL TIME
-            QDateTime deadline = task.getDeadline().toLocalTime();
+            QDateTime deadline = task.getDeadline();
             if (!deadline.isValid()) continue;
 
-            qDebug() << "   -> Khảo sát Task:" << task.getTitle()
-                     << "Status:" << (int)task.getStatus()
-                     << "Deadline:" << deadline.toString("yyyy-MM-dd hh:mm:ss")
-                     << "Current Now:" << now.toString("yyyy-MM-dd hh:mm:ss");
+            // Tính toán khoảng cách thời gian tính bằng giây
+            int64_t secondsToDeadline = now.secsTo(deadline);
 
-            if (now >= deadline) { //
-                qDebug()<<"bat dau tb";
-                if (!notifiedOverdueTasks.contains(taskId)) { //
-                    qDebug()<< "da tb";
-                    sendNotification("Cảnh Báo Quá Hạn! 🚨", QString("Công việc '%1' đã trễ hạn.").arg(task.getTitle()), QSystemTrayIcon::Critical); //
-                    notifiedOverdueTasks.insert(taskId); //
+            // 1. KIỂM TRA QUÁ HẠN
+            if (secondsToDeadline <= 0) {
+                if (!notifiedOverdueTasks.contains(taskId)) {
+                    sendNotification("Cảnh Báo Quá Hạn! 🚨", QString("Công việc '%1' đã trễ hạn.").arg(task.getTitle()), QSystemTrayIcon::Critical);
+                    notifiedOverdueTasks.insert(taskId);
                 }
-            } else { //
-                int64_t secondsToDeadline = now.secsTo(deadline); //
-                if (secondsToDeadline > 0 && secondsToDeadline <= 900) { //
-                    if (!notifiedUrgentTasks.contains(taskId)) { //
-                        sendNotification("Sắp Đến Hạn! ⏰", QString("Công việc '%1' sắp hết hạn!").arg(task.getTitle()), QSystemTrayIcon::Warning); //
-                        notifiedUrgentTasks.insert(taskId); //
+            }
+            // 2. KIỂM TRA SẮP ĐẾN HẠN
+            else {
+                // THÊM MỚI: Điều kiện cảnh báo trước 1 tiếng (Từ 55 phút đến 60 phút trước deadline)
+                if (secondsToDeadline > 3300 && secondsToDeadline <= 3600) {
+                    if (!notifiedOneHourWarningTasks.contains(taskId)) {
+                        sendNotification("Sắp Đến Hạn (Còn 1 Tiếng)! ⏳",
+                                         QString("Công việc '%1' sẽ hết hạn sau 1 tiếng nữa!").arg(task.getTitle()),
+                                         QSystemTrayIcon::Information);
+                        notifiedOneHourWarningTasks.insert(taskId);
                     }
+                    qDebug() << "Da bao";
+                }
+                // Điều kiện cảnh báo gấp trước 15 phút (Giữ nguyên như cũ)
+                else if (secondsToDeadline > 0 && secondsToDeadline <= 900) {
+                    if (!notifiedUrgentTasks.contains(taskId)) {
+                        sendNotification("Sắp Đến Hạn Gấp! ⏰", QString("Công việc '%1' còn 15 phút nữa hết hạn!").arg(task.getTitle()), QSystemTrayIcon::Warning);
+                        notifiedUrgentTasks.insert(taskId);
+                    }
+                    qDebug() << "Da bao";
                 }
             }
         }
     }
 
-    inline void clearTaskCache(const QString &taskId) { //
-        notifiedOverdueTasks.remove(taskId); //
-        notifiedUrgentTasks.remove(taskId); //
+    inline void clearTaskCache(const QString &taskId) {
+        notifiedOverdueTasks.remove(taskId);
+        notifiedUrgentTasks.remove(taskId);
+        notifiedOneHourWarningTasks.remove(taskId); // Xóa cache hàng chờ cảnh báo 1 tiếng khi Task được sửa/xóa
     }
 
-    // Hủy Menu khi giải phóng class để không bị rò rỉ bộ nhớ RAM
     inline ~TaskNotifier() {
         if (trayMenu) {
             delete trayMenu;
