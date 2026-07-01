@@ -5,6 +5,7 @@
 #include <QList>
 #include <QStack>
 #include <QString>
+#include <QJsonArray>
 
 class TaskManager
 {
@@ -21,6 +22,7 @@ public:
     bool deleteTask(int id);
     bool markTaskDone(int id);
     bool updateTaskId(int oldId, int newId);
+    void loadFromApi(const QJsonArray &array);
     
     // Undo
     void undoDelete();

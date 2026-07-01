@@ -65,6 +65,44 @@ QList<Task> TaskManager::getAllTasks() const {
     return tasks;
 }
 
+void TaskManager::loadFromApi(const QJsonArray &array)
+{
+    tasks.clear();
+    undoStack.clear();
+
+    for (const QJsonValue &value : array)
+    {
+        QJsonObject obj = value.toObject();
+
+        int id = obj["task_id"].toInt();
+        QString title = obj["title"].toString();
+        QString description = obj["description"].toString();
+
+        TaskStatus status;
+        switch (obj["status"].toInt())
+        {
+        case 0:
+            status = TaskStatus::TODO;
+            break;
+        case 1:
+            status = TaskStatus::IN_PROGRESS;
+            break;
+        case 2:
+            status = TaskStatus::DONE;
+            break;
+        default:
+            status = TaskStatus::TODO;
+        }
+
+        int priority = obj["priority"].toInt();
+
+        QDateTime deadline =
+            QDateTime::fromString(obj["deadline"].toString(), Qt::ISODate);
+
+        tasks.append(Task(id, title, description, status, priority, deadline));
+    }
+}
+
 QList<Task> TaskManager::searchTasks(const QString &keyword) const {
     QList<Task> result;
     for (const auto &task : tasks) {

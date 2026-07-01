@@ -12,7 +12,7 @@ private:
 
 public:
     // Constructor
-    Task(int id,
+    Task(int task_id,
          const QString &title,
          const QString &description,
          TaskStatus status,

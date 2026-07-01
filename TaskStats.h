@@ -11,7 +11,7 @@ enum class TaskStatus {
 
 struct TaskStats{
 public:
-    int id;
+    int task_id;
     QString title;
     QString description;
     TaskStatus status;

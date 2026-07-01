@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <algorithm>
 #include <QTextEdit>
+#include <iostream>
 #include <qjsonobject.h>
 #include "taskdialog.h"
 #include "ThemeUtils.h"
@@ -30,7 +31,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
     connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
 
-    refreshTaskList();
 }
 
 void MainWindow::setupUI()
@@ -126,10 +126,27 @@ void MainWindow::setupUI()
 
 void MainWindow::initData()
 {
-    dataFilePath = QDir::currentPath() + "/tasks.json";
-    taskManager.loadFromFile(dataFilePath);
-}
 
+
+    APIService::instance().getTasks(
+        [this](bool success, QJsonArray array)
+        {
+            qDebug() << "GET success =" << success;
+            qDebug() << "Size =" << array.size();
+
+            for (const auto &v : array)
+                qDebug() << v.toObject();
+
+            if (!success)
+                return;
+
+            taskManager.loadFromApi(array);
+
+            qDebug() << "TaskManager size =" << taskManager.getAllTasks().size();
+
+            refreshTaskList();
+        });
+}
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -138,58 +155,46 @@ MainWindow::~MainWindow()
 void MainWindow::addNewTask()
 {
     TaskDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted) {
-        taskManager.addTask(
-            dialog.getTitle(),
-            dialog.getDescription(),
-            dialog.getStatus(),
-            dialog.getPriority(),
-            dialog.getDeadline()
-            );
-        taskManager.saveToFile(dataFilePath);
 
-        // Lấy task vừa tạo (nằm cuối cùng trong danh sách)
-        QList<Task> all = taskManager.getAllTasks();
-        if (!all.isEmpty()) {
-            Task targetTask = all.last();
-            TaskStats ts;
-            ts.title = dialog.getTitle();
-            ts.description = dialog.getDescription();
-            ts.status = dialog.getStatus();
-            ts.priority = dialog.getPriority();
-            ts.deadline = dialog.getDeadline();
-            
-            // Cấp phát ID tạm cho task trước khi nhận ID từ server
-            int tempId = targetTask.getId();
-            
-            APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject obj){
-                if (success && !obj.isEmpty()) {
-                    int serverId = 0;
+    if (dialog.exec() != QDialog::Accepted)
+        return;
 
+    TaskStats ts;
+    ts.title = dialog.getTitle();
+    ts.description = dialog.getDescription();
+    ts.status = dialog.getStatus();
+    ts.priority = dialog.getPriority();
+    ts.deadline = dialog.getDeadline();
 
-                    if (obj.contains("id") || obj.contains("ID")) {
-                        QJsonValue idVal = obj.contains("id") ? obj["id"] : obj["ID"];
-                        serverId = idVal.isString() ? idVal.toString().toInt() : idVal.toInt();
+    APIService::instance().createNewTask(
+        ts,
+        [this](bool success, QJsonObject)
+        {
+            if (!success) {
+                qDebug() << "Tao task that bai";
+                return;
+            }
+
+            // Lấy lại toàn bộ danh sách từ server
+            APIService::instance().getTasks(
+                [this](bool success, QJsonArray array)
+                {
+                    if (!success) {
+                        qDebug() << "Lay danh sach task that bai";
+                        return;
                     }
-                    
-                    if (serverId != 0) {
-                        taskManager.updateTaskId(tempId, serverId);
-                        taskManager.saveToFile(dataFilePath);
-                        // Yêu cầu cập nhật lại giao diện ở thread chính
-                        QMetaObject::invokeMethod(this, "refreshTaskList", Qt::QueuedConnection);
-                    }
-                }
-            });
-        }
-        
-        refreshTaskList();
-    }
+
+                    taskManager.loadFromApi(array);
+                    refreshTaskList();
+                });
+        });
 }
 
 void MainWindow::refreshTaskList() {
     clearLayout(contentLayout);
 
     QList<Task> finalTasks = getFilteredAndSortedTasks();
+
 
     for (const Task &task : finalTasks) {
         renderTaskItem(task);
@@ -418,7 +423,7 @@ void MainWindow::onTaskStatusChanged(int state)
 
         // API Sync
         TaskStats ts;
-        ts.id = targetTask.getId();
+        ts.task_id = targetTask.getId();
         ts.title = targetTask.getTitle();
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
@@ -426,7 +431,6 @@ void MainWindow::onTaskStatusChanged(int state)
         ts.deadline = targetTask.getDeadline();
         APIService::instance().updateTask(ts, [](bool, QJsonArray){});
 
-        refreshTaskList();
     }
 }
 
@@ -435,11 +439,15 @@ void MainWindow::onDeleteTaskClicked()
     QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
     if (senderBtn) {
         int taskId = senderBtn->property("taskId").toInt();
-        taskManager.deleteTask(taskId);
-        taskManager.saveToFile(dataFilePath);
+        qDebug() << taskId;
+
 
         // API Sync
-        APIService::instance().deleteTask(taskId, [](bool, QJsonArray){});
+        APIService::instance().deleteTask(taskId, "soft", [](bool, QJsonArray){});
+
+        qDebug() << "Da Xoa";
+            taskManager.deleteTask(taskId);
+            taskManager.saveToFile(dataFilePath);
 
         refreshTaskList();
     }
@@ -517,7 +525,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 
                         // API Sync
                         TaskStats ts;
-                        ts.id = taskId;
+                        ts.task_id = taskId;
                         ts.title = dialog.getTitle();
                         ts.description = dialog.getDescription();
                         ts.status = dialog.getStatus();
