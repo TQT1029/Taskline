@@ -9,6 +9,8 @@
 #include <QTextEdit>
 #include "taskdialog.h"
 #include "ThemeUtils.h"
+#include "taskstatusbar.h"
+#include "tasksearch.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -68,8 +70,15 @@ void MainWindow::setupUI()
                                   ).arg(ThemeUtils::textMain()));
 
     topBarLayout->addWidget(menuButton); 
-    topBarLayout->addWidget(titleLabel); 
+    topBarLayout->addWidget(titleLabel);
+
     topBarLayout->addStretch();
+
+    taskSearch.setupInWidget(topBar);
+    topBarLayout->addWidget(taskSearch.searchButton);
+    topBarLayout->addWidget(taskSearch.searchEdit);
+
+    connect(&taskSearch, &TaskSearchHelper::searchRequested, this, &MainWindow::refreshTaskList);
 
     // 4. Khởi tạo nút + New
     newButton = new QPushButton("+ New", topBar);
@@ -114,7 +123,12 @@ void MainWindow::setupUI()
                                   "}"
                                   "QPushButton:hover { background-color: %4; }"
                                   ).arg(ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::border(), ThemeUtils::btnSecondaryHover()));
-    bottomBarLayout->addStretch();
+    taskTracker.setupInWidget(bottomBar);
+    bottomBarLayout->addWidget(taskTracker.statusLabel);
+    bottomBarLayout->addWidget(taskTracker.progressBar);
+
+    bottomBarLayout->addSpacing(15);
+
     bottomBarLayout->addWidget(undoButton);
 
     // Ghép Layout
@@ -171,9 +185,17 @@ void MainWindow::refreshTaskList() {
 
     QList<Task> finalTasks = getFilteredAndSortedTasks();
 
+    QString keyword = taskSearch.searchEdit ? taskSearch.searchEdit->text().trimmed() : "";
+
+    finalTasks = getFilteredAndSortedTasks();
     for (const Task &task : finalTasks) {
-        renderTaskItem(task);
+        // CHỈ VẼ RA MÀN HÌNH NẾU: Ô search trống HOẶC Tiêu đề/Mô tả có chứa từ khóa
+        if (keyword.isEmpty() || task.getTitle().contains(keyword, Qt::CaseInsensitive)  //
+            || task.getDescription().contains(keyword, Qt::CaseInsensitive)) { //
+            renderTaskItem(task); //
+        }
     }
+    taskTracker.updateStatistics(taskManager.getAllTasks());
 }
 
 void MainWindow::clearLayout(QLayout *layout) {
@@ -270,7 +292,7 @@ QLabel* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent)
         if (displayDesc.length() > maxChars) {
             displayDesc = displayDesc.left(maxChars).trimmed() + "...";
         }
-        
+
         // Chèn zero-width space (\u200B) để QLabel có thể tự do wrap/break-word
         // đối với các chuỗi dài liên tục không có dấu cách (như "awwwgydgyddd...")
         // mà vẫn giữ nguyên khả năng co giãn chiều cao (auto-scale height).

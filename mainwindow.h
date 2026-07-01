@@ -12,6 +12,8 @@
 #include <QScrollArea>
 #include <QCheckBox>
 #include "taskmanager.h"
+#include "taskstatusbar.h"
+#include "tasksearch.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -53,6 +55,8 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+    TaskStatusTracker taskTracker;
+    TaskSearchHelper taskSearch;
 
     // 2. Khai báo con trỏ nút bấm ở mục private
     QWidget *centralWidget;
