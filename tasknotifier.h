@@ -10,19 +10,19 @@
 #include <QMenu>        // Thêm thư viện quản lý Menu thả xuống
 #include <QAction>      // Thêm thư viện quản lý nút bấm trong Menu
 #include <QApplication> // Thêm thư viện để gọi lệnh tắt hẳn App
-#include "task.h"       //
+#include "task.h"
 #include <QDebug>
 
 class TaskNotifier : public QObject {
     Q_OBJECT
 private:
-    QSystemTrayIcon *trayIcon = nullptr; //
-    QTimer *checkTimer = nullptr; //
+    QSystemTrayIcon *trayIcon = nullptr;
+    QTimer *checkTimer = nullptr;
     QMenu *trayMenu = nullptr;     // Menu xuất hiện khi click chuột phải
     QAction *closeAction = nullptr; // Nút bấm "Thoát" nằm trong Menu
 
-    QSet<QString> notifiedOverdueTasks; //
-    QSet<QString> notifiedUrgentTasks; //
+    QSet<int> notifiedOverdueTasks;
+    QSet<int> notifiedUrgentTasks;
 
 public:
     inline explicit TaskNotifier(QObject *parent = nullptr) : QObject(parent) { //
@@ -98,7 +98,7 @@ public:
 
         for (const Task &task : allTasks) {
             if (task.getStatus() == TaskStatus::DONE) continue;
-            QString taskId = task.getId();
+            int taskId = task.getId();
 
             // ÉP DEADLINE CỦA TASK VỀ CÙNG HỆ LOCAL TIME
             QDateTime deadline = task.getDeadline().toLocalTime();
@@ -109,26 +109,26 @@ public:
                      << "Deadline:" << deadline.toString("yyyy-MM-dd hh:mm:ss")
                      << "Current Now:" << now.toString("yyyy-MM-dd hh:mm:ss");
 
-            if (now >= deadline) { //
+            if (now >= deadline) {
                 qDebug()<<"bat dau tb";
-                if (!notifiedOverdueTasks.contains(taskId)) { //
+                if (!notifiedOverdueTasks.contains(taskId)) {
                     qDebug()<< "da tb";
                     sendNotification("Cảnh Báo Quá Hạn! 🚨", QString("Công việc '%1' đã trễ hạn.").arg(task.getTitle()), QSystemTrayIcon::Critical); //
                     notifiedOverdueTasks.insert(taskId); //
                 }
             } else { //
-                int64_t secondsToDeadline = now.secsTo(deadline); //
-                if (secondsToDeadline > 0 && secondsToDeadline <= 900) { //
-                    if (!notifiedUrgentTasks.contains(taskId)) { //
+                int64_t secondsToDeadline = now.secsTo(deadline);
+                if (secondsToDeadline > 0 && secondsToDeadline <= 900) {
+                    if (!notifiedUrgentTasks.contains(taskId)) {
                         sendNotification("Sắp Đến Hạn! ⏰", QString("Công việc '%1' sắp hết hạn!").arg(task.getTitle()), QSystemTrayIcon::Warning); //
-                        notifiedUrgentTasks.insert(taskId); //
+                        notifiedUrgentTasks.insert(taskId);
                     }
                 }
             }
         }
     }
 
-    inline void clearTaskCache(const QString &taskId) { //
+    inline void clearTaskCache(const int &taskId) { //
         notifiedOverdueTasks.remove(taskId); //
         notifiedUrgentTasks.remove(taskId); //
     }
