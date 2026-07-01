@@ -14,6 +14,8 @@
 #include "taskmanager.h"
 #include "taskstatusbar.h"
 #include "tasksearch.h"
+#include <QCloseEvent>
+#include "tasknotifier.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -30,6 +32,7 @@ public:
     
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     void setupUI();
@@ -57,6 +60,7 @@ private:
     Ui::MainWindow *ui;
     TaskStatusTracker taskTracker;
     TaskSearchHelper taskSearch;
+    TaskNotifier *notifier = nullptr;
 
     // 2. Khai báo con trỏ nút bấm ở mục private
     QWidget *centralWidget;

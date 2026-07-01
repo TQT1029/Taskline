@@ -11,6 +11,7 @@
 #include "ThemeUtils.h"
 #include "taskstatusbar.h"
 #include "tasksearch.h"
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -135,6 +136,17 @@ void MainWindow::setupUI()
     mainLayout->addWidget(topBar, 0);      
     mainLayout->addWidget(scrollArea, 1);
     mainLayout->addWidget(bottomBar, 0);
+
+    notifier = new TaskNotifier(this);
+
+    QTimer *systemTimer = new QTimer(this);
+    connect(systemTimer, &QTimer::timeout, this, [this]() {
+        if (notifier) {
+            // Lấy danh sách task tươi mới nhất từ manager để ép quét
+            notifier->checkDeadlines(taskManager.getAllTasks());
+        }
+    });
+    systemTimer->start(10000); // Khởi động quét 10 giây/lần
 }
 
 void MainWindow::initData()
@@ -188,6 +200,7 @@ void MainWindow::refreshTaskList() {
     QString keyword = taskSearch.searchEdit ? taskSearch.searchEdit->text().trimmed() : "";
 
     finalTasks = getFilteredAndSortedTasks();
+
     for (const Task &task : finalTasks) {
         // CHỈ VẼ RA MÀN HÌNH NẾU: Ô search trống HOẶC Tiêu đề/Mô tả có chứa từ khóa
         if (keyword.isEmpty() || task.getTitle().contains(keyword, Qt::CaseInsensitive)  //
@@ -534,5 +547,25 @@ void MainWindow::onMenuButtonClicked()
 
         // Làm mới lại danh sách hiển thị với bộ lọc mới
         refreshTaskList();
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // Nếu icon khay hệ thống (System Tray) đang hoạt động
+    if (notifier) {
+        this->hide(); // Ẩn cửa sổ chính đi thay vì tắt hẳn
+
+        // Gửi thông báo cho người dùng biết ứng dụng đã được thu nhỏ xuống khay hệ thống
+        notifier->sendNotification(
+            "Taskline vẫn đang chạy ngầm",
+            "Ứng dụng đã được thu nhỏ xuống khay hệ thống để tiếp tục theo dõi deadline.",
+            QSystemTrayIcon::Information,
+            2000
+            );
+
+        event->ignore(); // Chặn sự kiện tắt ứng dụng (không cho quit)
+    } else {
+        event->accept(); // Nếu không có notifier, cho phép tắt ứng dụng bình thường
     }
 }
