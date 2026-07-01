@@ -8,7 +8,7 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
     setWindowTitle("Task Details");
     setMinimumWidth(400);
 
-    // Style
+    // Style tổng thể (Giữ nguyên cấu trúc CSS của bạn)
     setStyleSheet(QString(
                       "QDialog { background-color: %1; }"
                       "QLabel { color: %2; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }"
@@ -70,15 +70,14 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
                             ThemeUtils::btnPrimary(), ThemeUtils::btnPrimaryText(), ThemeUtils::btnPrimaryHover()
                             ));
 
-    // Khởi tạo controls
+    // Khởi tạo các ô nhập liệu
     titleInput = new QLineEdit(this);
     descInput = new QTextEdit(this);
     descInput->setMinimumHeight(80);
 
-    statusInput = new QComboBox(this);
-    statusInput->addItem("Chưa làm", QVariant((int)TaskStatus::TODO));
-    statusInput->addItem("Đang làm", QVariant((int)TaskStatus::IN_PROGRESS));
-    statusInput->addItem("Hoàn thành", QVariant((int)TaskStatus::DONE));
+    // THAY ĐỔI: Khởi tạo nhãn QLabel tĩnh hiển thị trạng thái mặc định ban đầu là "Đang làm"
+    statusLabel = new QLabel("Đang làm", this);
+    statusLabel->setStyleSheet(QString("font-size: 14px; color: %1; font-weight: bold; padding: 5px;").arg(ThemeUtils::textMain()));
 
     priorityInput = new QSpinBox(this);
     priorityInput->setRange(1, 10);
@@ -92,7 +91,7 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
     btnCancel = new QPushButton("Cancel", this);
     btnCancel->setObjectName("btnCancel");
 
-    // Bố cục
+    // Bố cục Form
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
     QHBoxLayout *topLayout = new QHBoxLayout();
@@ -103,9 +102,9 @@ TaskDialog::TaskDialog(QWidget *parent) : QDialog(parent), m_editable(true)
     QFormLayout *formLayout = new QFormLayout();
     formLayout->addRow("Tiêu đề:", titleInput);
     formLayout->addRow("Mô tả:", descInput);
-    formLayout->addRow("Trạng thái:", statusInput);
+    formLayout->addRow("Trạng thái:", statusLabel); // Đưa nhãn trạng thái tĩnh vào đây
     formLayout->addRow("Ưu tiên (1-10):", priorityInput);
-    formLayout->addRow("Hạn chót:", deadlineInput); // SỬA ĐỔI: Add widget vào layout ở đây để hiển thị lên UI
+    formLayout->addRow("Hạn chót:", deadlineInput);
 
     mainLayout->addLayout(formLayout);
 
@@ -127,12 +126,19 @@ void TaskDialog::setTaskData(const Task &task)
     titleInput->setText(task.getTitle());
     descInput->setText(task.getDescription());
 
-    int index = statusInput->findData(QVariant((int)task.getStatus()));
-    if (index != -1) statusInput->setCurrentIndex(index);
+    // THAY ĐỔI: Hiển thị trạng thái tĩnh tương ứng của Task lên nhãn chữ
+    if (task.getStatus() == TaskStatus::TODO) {
+        statusLabel->setText("Chưa làm");
+        statusLabel->setStyleSheet("font-size: 14px; color: #e74c3c; font-weight: bold;"); // Chữ đỏ cảnh báo
+    } else if (task.getStatus() == TaskStatus::IN_PROGRESS) {
+        statusLabel->setText("Đang làm");
+        statusLabel->setStyleSheet("font-size: 14px; color: #f1c40f; font-weight: bold;"); // Chữ vàng đang làm
+    } else if (task.getStatus() == TaskStatus::DONE) {
+        statusLabel->setText("Hoàn thành");
+        statusLabel->setStyleSheet("font-size: 14px; color: #2ecc71; font-weight: bold;"); // Chữ xanh hoàn thành
+    }
 
     priorityInput->setValue(task.getPriority());
-
-    // Nạp dữ liệu thời gian của Task vào ô nhập liệu
     deadlineInput->setDateTime(task.getDeadline());
 
     setEditMode(false);
@@ -143,7 +149,7 @@ void TaskDialog::setEditMode(bool editable)
     m_editable = editable;
 
     titleInput->setEnabled(editable);
-    statusInput->setEnabled(editable);
+    statusLabel->setEnabled(editable);
     priorityInput->setEnabled(editable);
     deadlineInput->setEnabled(editable);
 
@@ -191,7 +197,13 @@ void TaskDialog::onCancelClicked()
 
 QString TaskDialog::getTitle() const { return titleInput->text(); }
 QString TaskDialog::getDescription() const { return descInput->toPlainText(); }
-TaskStatus TaskDialog::getStatus() const { return (TaskStatus)statusInput->currentData().toInt(); }
+TaskStatus TaskDialog::getStatus() const
+{
+    QString currentText = statusLabel->text();
+    if (currentText == "Chưa làm") return TaskStatus::TODO;
+    if (currentText == "Hoàn thành") return TaskStatus::DONE;
+    return TaskStatus::IN_PROGRESS; // Mặc định trả về Đang làm
+}
 int TaskDialog::getPriority() const { return priorityInput->value(); }
 TaskDeadline TaskDialog::getDeadline() const
 {

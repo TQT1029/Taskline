@@ -165,14 +165,18 @@ MainWindow::~MainWindow()
 void MainWindow::addNewTask()
 {
     TaskDialog dialog(this);
+
+    dialog.setDefaultDeadline(QDateTime::currentDateTime());
+
     if (dialog.exec() == QDialog::Accepted) {
-        // Lấy dữ liệu thời gian trực tiếp từ Dialog do người dùng chọn
+        // Lấy dữ liệu thời gian do người dùng chọn (mặc định ban đầu đã là thời gian hiện tại)
         QDateTime userDateTime = dialog.getDeadline().getDateTime();
 
+        // THAY ĐỔI: Khi tạo mới, ép trạng thái lưu trữ xuống file luôn là Đang làm (IN_PROGRESS)
         taskManager.addTask(
             dialog.getTitle(),
             dialog.getDescription(),
-            dialog.getStatus(),
+            TaskStatus::IN_PROGRESS,
             dialog.getPriority(),
             userDateTime
             );
@@ -184,9 +188,9 @@ void MainWindow::addNewTask()
             ts.id = all.last().getId();
             ts.title = dialog.getTitle();
             ts.description = dialog.getDescription();
-            ts.status = dialog.getStatus();
+            ts.status = TaskStatus::IN_PROGRESS; // Đồng bộ trạng thái Đang làm lên API Server
             ts.priority = dialog.getPriority();
-            ts.deadline = userDateTime; // Đồng bộ mốc thời gian thực tế lên Server API
+            ts.deadline = userDateTime;
 
             APIService::instance().createNewTask(ts, [](bool success, QJsonArray data){
                 Q_UNUSED(success);
@@ -197,7 +201,6 @@ void MainWindow::addNewTask()
         refreshTaskList();
     }
 }
-
 void MainWindow::refreshTaskList() {
     clearLayout(contentLayout);
 
@@ -230,13 +233,44 @@ void MainWindow::clearLayout(QLayout *layout) {
 }
 
 QList<Task> MainWindow::getFilteredAndSortedTasks() {
+    QList<Task> allTasks = taskManager.getAllTasks();
     QList<Task> displayTasks;
+    QDateTime now = QDateTime::currentDateTime(); // Lấy thời gian thực tại của hệ thống máy tính
 
-    if (currentStatusFilter == 1) displayTasks = taskManager.filterByStatus(TaskStatus::TODO);
-    else if (currentStatusFilter == 2) displayTasks = taskManager.filterByStatus(TaskStatus::IN_PROGRESS);
-    else if (currentStatusFilter == 3) displayTasks = taskManager.filterByStatus(TaskStatus::DONE);
-    else displayTasks = taskManager.getAllTasks();
+    // THAY ĐỔI: Vòng lặp tự động hóa cập nhật trạng thái dựa vào mốc thời gian thực tế
+    for (Task &task : allTasks) {
+        // Chỉ quét xử lý tự động đối với các Task chưa HOÀN THÀNH
+        if (task.getStatus() != TaskStatus::DONE) {
+            // THAY ĐỔI: Nếu thời gian hiện tại đã vượt qua deadline (> deadline)
+            if (now > task.getDeadline()) {
+                if (task.getStatus() != TaskStatus::TODO) {
+                    task.setStatus(TaskStatus::TODO); // Chuyển ngầm thành Chưa làm (Quá hạn)
+                    taskManager.editTask(task.getId(), task.getTitle(), task.getDescription(), TaskStatus::TODO, task.getPriority(), task.getDeadline());
+                }
+            } else {
+                // THAY ĐỔI: Nếu thời gian hiện tại vẫn chưa đến hạn (<= deadline) thì giữ ở Đang làm
+                if (task.getStatus() != TaskStatus::IN_PROGRESS) {
+                    task.setStatus(TaskStatus::IN_PROGRESS); // Trả về trạng thái Đang làm
+                    taskManager.editTask(task.getId(), task.getTitle(), task.getDescription(), TaskStatus::IN_PROGRESS, task.getPriority(), task.getDeadline());
+                }
+            }
+        }
+    }
+    // Ghi nhận cấu trúc trạng thái tự động mới xuống tệp tin JSON lưu trữ cục bộ
+    taskManager.saveToFile(dataFilePath);
 
+    // Tiến hành phân loại lọc danh sách theo Tab bộ lọc trạng thái đang chọn ngoài UI
+    if (currentStatusFilter == 1) {
+        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::TODO) displayTasks.append(t); }
+    } else if (currentStatusFilter == 2) {
+        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::IN_PROGRESS) displayTasks.append(t); }
+    } else if (currentStatusFilter == 3) {
+        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::DONE) displayTasks.append(t); }
+    } else {
+        displayTasks = allTasks;
+    }
+
+    // Lọc theo cấp độ Độ ưu tiên của công việc
     if (currentPriorityFilter != 0) {
         QList<Task> tempTasks;
         for (const Task &task : displayTasks) {
@@ -247,6 +281,7 @@ QList<Task> MainWindow::getFilteredAndSortedTasks() {
         displayTasks = tempTasks;
     }
 
+    // Tiến hành sắp xếp danh sách hiển thị dựa theo thời gian tăng/giảm của hạn chót
     if (currentSortOrder == 1) {
         std::sort(displayTasks.begin(), displayTasks.end(), [](const Task &a, const Task &b) {
             return a.getDeadline() < b.getDeadline();
@@ -436,16 +471,16 @@ void MainWindow::onTaskStatusChanged(int state)
             taskManager.markTaskDone(taskId);
             targetTask.setStatus(TaskStatus::DONE);
         } else {
-            // Giữ nguyên targetTask.getDeadline() trả về QDateTime thuần của Qt
+            // THAY ĐỔI: Khi người dùng bỏ tích chọn Checkbox, trạng thái trả về Đang làm (IN_PROGRESS)
             taskManager.editTask(
                 taskId,
                 targetTask.getTitle(),
                 targetTask.getDescription(),
-                TaskStatus::TODO,
+                TaskStatus::IN_PROGRESS,
                 targetTask.getPriority(),
                 targetTask.getDeadline()
                 );
-            targetTask.setStatus(TaskStatus::TODO);
+            targetTask.setStatus(TaskStatus::IN_PROGRESS);
         }
         taskManager.saveToFile(dataFilePath);
 
@@ -456,7 +491,7 @@ void MainWindow::onTaskStatusChanged(int state)
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
         ts.priority = targetTask.getPriority();
-        ts.deadline = targetTask.getDeadline(); // Gán trực tiếp QDateTime thuần sang struct API
+        ts.deadline = targetTask.getDeadline();
 
         APIService::instance().updateTask(ts, [](bool, QJsonArray){});
 

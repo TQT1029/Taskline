@@ -27,6 +27,8 @@ public:
     void setEditMode(bool editable);
     bool isEditable() const;
 
+    void setDefaultDeadline(const QDateTime &dt) { deadlineInput->setDateTime(dt); }
+
     QString getTitle() const;
     QString getDescription() const;
     TaskStatus getStatus() const;
@@ -41,7 +43,7 @@ private slots:
 private:
     QLineEdit *titleInput;
     QTextEdit *descInput;
-    QComboBox *statusInput;
+    QLabel *statusLabel;
     QSpinBox *priorityInput;
     DeadlineSelectorWidget *deadlineInput;
 

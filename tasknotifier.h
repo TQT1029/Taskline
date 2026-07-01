@@ -113,7 +113,6 @@ public:
                                          QSystemTrayIcon::Information);
                         notifiedOneHourWarningTasks.insert(taskId);
                     }
-                    qDebug() << "Da bao";
                 }
                 // Điều kiện cảnh báo gấp trước 15 phút (Giữ nguyên như cũ)
                 else if (secondsToDeadline > 0 && secondsToDeadline <= 900) {
@@ -121,7 +120,6 @@ public:
                         sendNotification("Sắp Đến Hạn Gấp! ⏰", QString("Công việc '%1' còn 15 phút nữa hết hạn!").arg(task.getTitle()), QSystemTrayIcon::Warning);
                         notifiedUrgentTasks.insert(taskId);
                     }
-                    qDebug() << "Da bao";
                 }
             }
         }

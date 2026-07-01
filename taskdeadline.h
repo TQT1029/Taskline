@@ -165,37 +165,52 @@ public:
         QHBoxLayout *layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(2);
-        layout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        layout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter); // Căn giữa toàn bộ cụm theo trục dọc
 
-        // Khởi tạo SpinBox trống biên độ trước
+        QDateTime current = QDateTime::currentDateTime().addDays(1);
+
+        // Khởi tạo các SpinBox dữ liệu
         daySpin = createSubSelector(1, 31);
         monthSpin = createSubSelector(1, 12);
         yearSpin = createSubSelector(2000, 2100);
         hourSpin = createSubSelector(0, 23);
         minuteSpin = createSubSelector(0, 59);
 
-        // Đắp Layout và định nghĩa định danh loại tính toán "DAY", "MONTH", "YEAR"...
-        layout->addWidget(createColumn("Ngày", daySpin, "DAY"));
+        // Hàm lambda cục bộ để dựng cột dấu phân cách căn chỉnh theo 3 tầng (Nhãn - Hộp - Nút)
+        auto createSeparatorColumn = [this](const QString &symbol) -> QWidget* {
+            QWidget *sepWidget = new QWidget(this);
+            QVBoxLayout *sepLayout = new QVBoxLayout(sepWidget);
+            sepLayout->setContentsMargins(0, 0, 0, 0);
+            sepLayout->setSpacing(3);
 
-        QLabel *slash1 = new QLabel("/", this);
-        slash1->setStyleSheet("padding-top: 20px; color: #bdc3c7; font-weight: bold;");
-        layout->addWidget(slash1);
+            // Tầng 1: Khoảng trống tương đương với chiều cao của chữ nhãn nhỏ "Ngày/Tháng..." (11px)
+            sepLayout->addSpacing(14);
+
+            // Tầng 2: Dấu phân cách nằm căn giữa hoàn hảo theo chiều dọc của hộp số
+            QLabel *label = new QLabel(symbol, sepWidget);
+            label->setAlignment(Qt::AlignCenter);
+            label->setStyleSheet("color: #bdc3c7; font-weight: bold; font-size: 16px; background: transparent;");
+            sepLayout->addWidget(label);
+
+            // Tầng 3: Khoảng trống tương đương với chiều cao của cụm nút bấm điều khiển phía dưới
+            sepLayout->addSpacing(16);
+
+            return sepWidget;
+        };
+
+        // Ráp Layout hoàn chỉnh kết hợp các cột số và cột dấu phân cách độc lập
+        layout->addWidget(createColumn("Ngày", daySpin, "DAY"));
+        layout->addWidget(createSeparatorColumn("/"));
 
         layout->addWidget(createColumn("Tháng", monthSpin, "MONTH"));
-
-        QLabel *slash2 = new QLabel("/", this);
-        slash2->setStyleSheet("padding-top: 20px; color: #bdc3c7; font-weight: bold;");
-        layout->addWidget(slash2);
+        layout->addWidget(createSeparatorColumn("/"));
 
         layout->addWidget(createColumn("Năm", yearSpin, "YEAR"));
 
-        layout->addSpacing(12);
+        layout->addSpacing(10); // Tạo khoảng trống phân tách vừa phải giữa cụm Ngày và Giờ
 
         layout->addWidget(createColumn("Giờ", hourSpin, "HOUR"));
-
-        QLabel *colon = new QLabel(":", this);
-        colon->setStyleSheet("padding-top: 20px; color: #bdc3c7; font-weight: bold;");
-        layout->addWidget(colon);
+        layout->addWidget(createSeparatorColumn(":"));
 
         layout->addWidget(createColumn("Phút", minuteSpin, "MIN"));
 
