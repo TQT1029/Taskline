@@ -28,13 +28,13 @@ public:
     void getTasks(std::function<void(bool, QJsonArray)> callback);
     
     // Gửi yêu cầu tạo mới một Task
-    void createNewTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback);
+    void createNewTask(TaskStats taskStats, std::function<void(bool, QJsonObject)> callback);
     
     // Gửi yêu cầu cập nhật một Task đã tồn tại
     void updateTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback);
     
     // Gửi yêu cầu xóa một Task
-    void deleteTask(QString taskId, std::function<void(bool, QJsonArray)> callback);
+    void deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback);
 
     // Lấy danh sách Task đã được sắp xếp từ server
     void sortTasks(std::function<void(bool, QJsonArray)> callback);

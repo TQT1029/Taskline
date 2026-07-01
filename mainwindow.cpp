@@ -150,15 +150,31 @@ void MainWindow::addNewTask()
         // Lấy task vừa tạo (nằm cuối cùng trong danh sách)
         QList<Task> all = taskManager.getAllTasks();
         if (!all.isEmpty()) {
+            Task targetTask = all.last();
             TaskStats ts;
-            ts.id = all.last().getId();
             ts.title = dialog.getTitle();
             ts.description = dialog.getDescription();
             ts.status = dialog.getStatus();
             ts.priority = dialog.getPriority();
             ts.deadline = dialog.getDeadline();
-            APIService::instance().createNewTask(ts, [](bool success, QJsonArray data){
-                // Xử lý khi API phản hồi (không bắt buộc vì dùng local làm chính hiện tại)
+            
+            int tempId = targetTask.getId();
+            
+            APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject obj){
+                if (success && !obj.isEmpty()) {
+                    int serverId = 0;
+                    if (obj.contains("id") || obj.contains("ID")) {
+                        QJsonValue idVal = obj.contains("id") ? obj["id"] : obj["ID"];
+                        serverId = idVal.isString() ? idVal.toString().toInt() : idVal.toInt();
+                    }
+                    
+                    if (serverId != 0) {
+                        taskManager.updateTaskId(tempId, serverId);
+                        taskManager.saveToFile(dataFilePath);
+                        // Yêu cầu cập nhật lại giao diện ở thread chính
+                        QMetaObject::invokeMethod(this, "refreshTaskList", Qt::QueuedConnection);
+                    }
+                }
             });
         }
         
@@ -298,7 +314,7 @@ QWidget* MainWindow::createStatusBadge(TaskStatus status, QWidget *parent) {
     return statusColorWidget;
 }
 
-QToolButton* MainWindow::createDeleteButton(QString taskId, QWidget *parent) {
+QToolButton* MainWindow::createDeleteButton(int taskId, QWidget *parent) {
     QToolButton *deleteBtn = new QToolButton(parent);
     deleteBtn->setText("🗑");
     deleteBtn->setStyleSheet(
@@ -376,7 +392,7 @@ void MainWindow::onTaskStatusChanged(int state)
 {
     QCheckBox *senderCb = qobject_cast<QCheckBox*>(sender());
     if (senderCb) {
-        QString taskId = senderCb->property("taskId").toString();
+        int taskId = senderCb->property("taskId").toInt();
         QList<Task> allTasks = taskManager.getAllTasks();
         Task targetTask = allTasks.first(); 
         
@@ -414,7 +430,7 @@ void MainWindow::onDeleteTaskClicked()
 {
     QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
     if (senderBtn) {
-        QString taskId = senderBtn->property("taskId").toString();
+        int taskId = senderBtn->property("taskId").toInt();
         taskManager.deleteTask(taskId);
         taskManager.saveToFile(dataFilePath);
 
@@ -437,13 +453,29 @@ void MainWindow::onUndoTaskClicked()
         // Giả sử Task vừa Undo được push vào cuối (theo cơ chế m_tasks của TaskManager)
         Task targetTask = all.last();
         TaskStats ts;
-        ts.id = targetTask.getId();
         ts.title = targetTask.getTitle();
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
         ts.priority = targetTask.getPriority();
         ts.deadline = targetTask.getDeadline();
-        APIService::instance().createNewTask(ts, [](bool, QJsonArray){});
+        
+        int tempId = targetTask.getId();
+        
+        APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject obj){
+            if (success && !obj.isEmpty()) {
+                int serverId = 0;
+                if (obj.contains("id") || obj.contains("ID")) {
+                    QJsonValue idVal = obj.contains("id") ? obj["id"] : obj["ID"];
+                    serverId = idVal.isString() ? idVal.toString().toInt() : idVal.toInt();
+                }
+                
+                if (serverId != 0) {
+                    taskManager.updateTaskId(tempId, serverId);
+                    taskManager.saveToFile(dataFilePath);
+                    QMetaObject::invokeMethod(this, "refreshTaskList", Qt::QueuedConnection);
+                }
+            }
+        });
     }
 
     refreshTaskList();
@@ -461,7 +493,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     if (event->type() == QEvent::MouseButtonRelease) {
         QWidget *widget = qobject_cast<QWidget*>(watched);
         if (widget && widget->property("taskId").isValid()) {
-            QString taskId = widget->property("taskId").toString();
+            int taskId = widget->property("taskId").toInt();
             
             QList<Task> allTasks = taskManager.getAllTasks();
             for (const Task &t : allTasks) {

@@ -57,16 +57,15 @@ void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
 /**
  * @brief Tạo mới một Task và gửi lên server
  */
-void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback) {
+void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJsonObject)> callback) {
     QNetworkRequest request = createRequest("/tasks"); // POST endpoint
     
     QJsonObject json;
-    json["ID"] = taskStats.id;
-    json["Title"] = taskStats.title;
-    json["Description"] = taskStats.description;
-    json["Status"] = Task::statusToString(taskStats.status);
-    json["Priority"] = taskStats.priority;
-    json["Deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
+    json["title"] = taskStats.title;
+    json["description"] = taskStats.description;
+    json["status"] = Task::statusToString(taskStats.status);
+    json["priority"] = taskStats.priority;
+    json["deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
 
     QByteArray data = QJsonDocument(json).toJson();
     QNetworkReply *reply = manager->post(request, data);
@@ -74,13 +73,13 @@ void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJs
 
     connect(reply, &QNetworkReply::finished, [reply, callback]() {
         if (reply->error() != QNetworkReply::NoError) {
-            callback(false, QJsonArray());
+            callback(false, QJsonObject());
             reply->deleteLater();
             return;
         }
         
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        callback(true, doc.array());
+        callback(true, doc.object());
         reply->deleteLater();
     });
 }
@@ -93,11 +92,12 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
     QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.id)); 
     
     QJsonObject json;
-    json["Title"] = taskStats.title;
-    json["Description"] = taskStats.description;
-    json["Status"] = Task::statusToString(taskStats.status);
-    json["Priority"] = taskStats.priority;
-    json["Deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
+    json["task_id"] = taskStats.id;
+    json["title"] = taskStats.title;
+    json["description"] = taskStats.description;
+    json["status"] = Task::statusToString(taskStats.status);
+    json["priority"] = taskStats.priority;
+    json["deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
 
     QByteArray data = QJsonDocument(json).toJson();
     QNetworkReply *reply = manager->put(request, data); // REST chuẩn dùng PUT/PATCH cho update
@@ -118,7 +118,7 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
 /**
  * @brief Xóa một Task dựa trên ID
  */
-void APIService::deleteTask(QString taskId, std::function<void(bool, QJsonArray)> callback) {
+void APIService::deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback) {
     QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskId)); 
     QNetworkReply *reply = manager->deleteResource(request);
     handleSslErrors(reply);
