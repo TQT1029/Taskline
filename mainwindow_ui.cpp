@@ -234,7 +234,7 @@ QWidget* MainWindowUI::createStatusBadge(TaskStatus status, QWidget *parent) {
     return statusColorWidget;
 }
 
-QToolButton* MainWindowUI::createDeleteButton(QString taskId, QWidget *parent) {
+QToolButton* MainWindowUI::createDeleteButton(int taskId, QWidget *parent) {
     QToolButton *deleteBtn = new QToolButton(parent);
     deleteBtn->setText("🗑");
     deleteBtn->setStyleSheet(
@@ -273,13 +273,13 @@ QCheckBox* MainWindowUI::createStatusCheckBox(const Task &task, QWidget *parent)
 void MainWindowUI::onInternalDeleteClicked() {
     QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
     if (senderBtn) {
-        emit deleteTaskClicked(senderBtn->property("taskId").toString());
+        emit deleteTaskClicked(senderBtn->property("taskId").toInt());
     }
 }
 
 void MainWindowUI::onInternalStatusChanged(int state) {
     QCheckBox *senderCb = qobject_cast<QCheckBox*>(sender());
     if (senderCb) {
-        emit taskStatusChanged(senderCb->property("taskId").toString(), state);
+        emit taskStatusChanged(senderCb->property("taskId").toInt(), state);
     }
 }

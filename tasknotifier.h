@@ -20,9 +20,9 @@ private:
     QMenu *trayMenu = nullptr;
     QAction *closeAction = nullptr;
 
-    QSet<QString> notifiedOverdueTasks;
-    QSet<QString> notifiedUrgentTasks;
-    QSet<QString> notifiedOneHourWarningTasks;
+    QSet<int> notifiedOverdueTasks;
+    QSet<int> notifiedUrgentTasks;
+    QSet<int> notifiedOneHourWarningTasks;
 
 public:
     explicit TaskNotifier(QObject *parent = nullptr);
@@ -33,7 +33,7 @@ public:
                           int durationMs = 3000);
 
     void checkDeadlines(const QList<Task> &allTasks);
-    void clearTaskCache(const QString &taskId);
+    void clearTaskCache(const int &taskId);
 };
 
 #endif // TASKNOTIFIER_H

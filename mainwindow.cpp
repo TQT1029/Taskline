@@ -5,7 +5,9 @@
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
+#include <QJsonObject>
 #include <algorithm>
+#include <iostream>
 #include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -83,7 +85,8 @@ void MainWindow::addNewTask()
             ts.priority = dialog.getPriority();
             ts.deadline = userDateTime;
 
-            APIService::instance().createNewTask(ts, [](bool success, QJsonArray data){
+            APIService::instance().createNewTask(ts, [](bool success, QJsonObject data){
+                //Xử lý phản hồi
                 Q_UNUSED(success);
                 Q_UNUSED(data);
             });
@@ -163,7 +166,7 @@ QList<Task> MainWindow::getFilteredAndSortedTasks() {
     return displayTasks;
 }
 
-void MainWindow::onTaskStatusChanged(QString taskId, int state)
+void MainWindow::onTaskStatusChanged(int taskId, int state)
 {
     QList<Task> allTasks = taskManager.getAllTasks();
     Task targetTask = allTasks.first();
@@ -204,12 +207,14 @@ void MainWindow::onTaskStatusChanged(QString taskId, int state)
     refreshTaskList();
 }
 
-void MainWindow::onDeleteTaskClicked(QString taskId)
+void MainWindow::onDeleteTaskClicked(int taskId)
 {
     taskManager.deleteTask(taskId);
     taskManager.saveToFile(dataFilePath);
 
-    APIService::instance().deleteTask(taskId, [](bool, QJsonArray){});
+    APIService::instance().deleteTask(taskId, "task", [](bool, QJsonArray){
+        //xử lý phản hồi
+    });
 
     refreshTaskList();
 }
@@ -230,7 +235,11 @@ void MainWindow::onUndoTaskClicked()
         ts.priority = targetTask.getPriority();
         ts.deadline = targetTask.getDeadline();
 
-        APIService::instance().createNewTask(ts, [](bool, QJsonArray){});
+        APIService::instance().createNewTask(ts, [](bool success, QJsonObject data){
+            //Xử lý phản hồi
+            Q_UNUSED(success);
+            Q_UNUSED(data);
+        });
     }
 
     refreshTaskList();
@@ -241,8 +250,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     if (event->type() == QEvent::MouseButtonRelease) {
         QWidget *widget = qobject_cast<QWidget*>(watched);
         if (widget && widget->property("taskId").isValid()) {
-            QString taskId = widget->property("taskId").toString();
-
+            int taskId = widget->property("taskId").toInt();
             QList<Task> allTasks = taskManager.getAllTasks();
             for (const Task &t : allTasks) {
                 if (t.getId() == taskId) {

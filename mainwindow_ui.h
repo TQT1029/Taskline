@@ -31,14 +31,14 @@ public:
     TaskSearchHelper *taskSearch = nullptr;
     
 signals:
-    void deleteTaskClicked(QString taskId);
-    void taskStatusChanged(QString taskId, int state);
+    void deleteTaskClicked(int taskId);
+    void taskStatusChanged(int taskId, int state);
 
 private:
     QWidget* createTextContainer(const Task &task, QWidget *parent);
     QLabel* createDescriptionLabel(const QString &desc, QWidget *parent);
     QWidget* createStatusBadge(TaskStatus status, QWidget *parent);
-    QToolButton* createDeleteButton(QString taskId, QWidget *parent);
+    QToolButton* createDeleteButton(int taskId, QWidget *parent);
     QCheckBox* createStatusCheckBox(const Task &task, QWidget *parent);
 
     // Layout elements

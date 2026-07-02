@@ -30,8 +30,8 @@ private:
 private slots:
     void addNewTask();
     void refreshTaskList();
-    void onTaskStatusChanged(QString taskId, int state);
-    void onDeleteTaskClicked(QString taskId);
+    void onTaskStatusChanged(int taskId, int state);
+    void onDeleteTaskClicked(int taskId);
     void onUndoTaskClicked();
     void onMenuButtonClicked();
 

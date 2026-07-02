@@ -67,7 +67,7 @@ void TaskNotifier::checkDeadlines(const QList<Task> &allTasks) {
 
     for (const Task &task : allTasks) {
         if (task.getStatus() == TaskStatus::DONE) continue;
-        QString taskId = task.getId();
+        int taskId = task.getId();
 
         QDateTime deadline = task.getDeadline();
         if (!deadline.isValid()) continue;
@@ -104,7 +104,7 @@ void TaskNotifier::checkDeadlines(const QList<Task> &allTasks) {
     }
 }
 
-void TaskNotifier::clearTaskCache(const QString &taskId) {
+void TaskNotifier::clearTaskCache(const int &taskId) {
     notifiedOverdueTasks.remove(taskId);
     notifiedUrgentTasks.remove(taskId);
     notifiedOneHourWarningTasks.remove(taskId); // Xóa cache hàng chờ cảnh báo 1 tiếng khi Task được sửa/xóa

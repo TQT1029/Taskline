@@ -115,7 +115,7 @@ void APIService::createNewTask(TaskStats taskStats,
  */
 void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback) {
     // Thường update dùng ID trên URL, ví dụ: /tasks/123
-    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.task_id));
+    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.id));
     
     QJsonObject json;
     json["title"] = taskStats.title;
