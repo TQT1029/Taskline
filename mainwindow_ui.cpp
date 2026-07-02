@@ -3,7 +3,7 @@
 #include "taskdeadline.h"
 
 MainWindowUI::MainWindowUI(QObject *parent) : QObject(parent) {
-    taskTracker = new TaskStatusTracker(this);
+    taskTracker = new TaskStatusTracker();
     taskSearch = new TaskSearchHelper(this);
 }
 
