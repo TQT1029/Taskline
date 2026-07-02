@@ -2,12 +2,12 @@
 #include "filterdialog.h"
 #include "apiservice.h"
 #include "./ui_mainwindow.h"
+#include <utility>
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
 #include <QJsonObject>
 #include <algorithm>
-#include <iostream>
 #include "taskdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -49,9 +49,26 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::initData()
 {
-    dataFilePath = QDir::currentPath() + "/tasks.json";
-    taskManager.loadFromFile(dataFilePath);
+    APIService::instance().getTasks(
+        [this](bool success, QJsonArray array)
+        {
+            qDebug() << "GET success =" << success;
+            qDebug() << "Size =" << array.size();
+
+            for (const auto &v : array)
+                qDebug() << v.toObject();
+
+            if (!success)
+                return;
+
+            taskManager.loadFromApi(array);
+
+            qDebug() << "TaskManager size =" << taskManager.getAllTasks().size();
+
+            refreshTaskList();
+        });
 }
+
 
 MainWindow::~MainWindow()
 {
@@ -63,34 +80,52 @@ void MainWindow::addNewTask()
     TaskDialog dialog(this);
     dialog.setDefaultDeadline(QDateTime::currentDateTime());
 
-    if (dialog.exec() == QDialog::Accepted) {
-        QDateTime userDateTime = dialog.getDeadline().getDateTime();
+    if (dialog.exec() != QDialog::Accepted) return;
 
-        taskManager.addTask(
-            dialog.getTitle(),
-            dialog.getDescription(),
-            TaskStatus::IN_PROGRESS,
-            dialog.getPriority(),
-            userDateTime
-            );
-        taskManager.saveToFile(dataFilePath);
+    QDateTime userDateTime = dialog.getDeadline().getDateTime();
 
-        QList<Task> all = taskManager.getAllTasks();
-        if (!all.isEmpty()) {
-            TaskStats ts;
-            ts.id = all.last().getId();
-            ts.title = dialog.getTitle();
-            ts.description = dialog.getDescription();
-            ts.status = TaskStatus::IN_PROGRESS;
-            ts.priority = dialog.getPriority();
-            ts.deadline = userDateTime;
+    taskManager.addTask(
+        dialog.getTitle(),
+        dialog.getDescription(),
+        TaskStatus::IN_PROGRESS,
+        dialog.getPriority(),
+        userDateTime
+        );
 
-            APIService::instance().createNewTask(ts, [](bool success, QJsonObject data){
-                //Xử lý phản hồi
-                Q_UNUSED(success);
-                Q_UNUSED(data);
-            });
-        }
+    taskManager.saveToFile(dataFilePath);
+
+    QList<Task> all = taskManager.getAllTasks();
+    if (!all.isEmpty()) {
+        TaskStats ts;
+        ts.id = all.last().getId();
+        ts.title = dialog.getTitle();
+        ts.description = dialog.getDescription();
+        ts.status = TaskStatus::IN_PROGRESS;
+        ts.priority = dialog.getPriority();
+        ts.deadline = userDateTime;
+
+        int tempId = ts.id;
+        APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject data){
+            if (!success || data.isEmpty()) { 
+                qDebug() << "Can't create new task in Back-end";
+                return;
+            }
+
+            int realId = 0;
+            if (data.contains("task_id")) {
+                realId = data["task_id"].toInt();
+            } else if (data.contains("id")) {
+                realId = data["id"].toInt();
+            }
+
+            if (realId != 0) {
+                taskManager.updateTaskId(tempId, realId);
+                taskManager.saveToFile(dataFilePath);
+                refreshTaskList();
+                qDebug() << "Task created! Real ID updated:" << realId;
+            }
+        });
+
 
         refreshTaskList();
     }
@@ -102,7 +137,7 @@ void MainWindow::refreshTaskList() {
     QList<Task> finalTasks = getFilteredAndSortedTasks();
     QString keyword = view->taskSearch->searchEdit ? view->taskSearch->searchEdit->text().trimmed() : "";
 
-    for (const Task &task : finalTasks) {
+    for (const Task &task : std::as_const(finalTasks)) {
         if (keyword.isEmpty() || task.getTitle().contains(keyword, Qt::CaseInsensitive)
             || task.getDescription().contains(keyword, Qt::CaseInsensitive)) {
             view->renderTaskItem(task, this);
@@ -134,18 +169,18 @@ QList<Task> MainWindow::getFilteredAndSortedTasks() {
     taskManager.saveToFile(dataFilePath);
 
     if (currentStatusFilter == 1) {
-        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::TODO) displayTasks.append(t); }
+        for (const Task &t : std::as_const(allTasks)) { if (t.getStatus() == TaskStatus::TODO) displayTasks.append(t); }
     } else if (currentStatusFilter == 2) {
-        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::IN_PROGRESS) displayTasks.append(t); }
+        for (const Task &t : std::as_const(allTasks)) { if (t.getStatus() == TaskStatus::IN_PROGRESS) displayTasks.append(t); }
     } else if (currentStatusFilter == 3) {
-        for (const Task &t : allTasks) { if (t.getStatus() == TaskStatus::DONE) displayTasks.append(t); }
+        for (const Task &t : std::as_const(allTasks)) { if (t.getStatus() == TaskStatus::DONE) displayTasks.append(t); }
     } else {
         displayTasks = allTasks;
     }
 
     if (currentPriorityFilter != 0) {
         QList<Task> tempTasks;
-        for (const Task &task : displayTasks) {
+        for (const Task &task : std::as_const(displayTasks)) {
             if (task.getPriority() == currentPriorityFilter) {
                 tempTasks.append(task);
             }
@@ -171,7 +206,7 @@ void MainWindow::onTaskStatusChanged(int taskId, int state)
     QList<Task> allTasks = taskManager.getAllTasks();
     Task targetTask = allTasks.first();
 
-    for (const Task &t : allTasks) {
+    for (const Task &t : std::as_const(allTasks)) {
         if (t.getId() == taskId) {
             targetTask = t;
             break;
@@ -202,7 +237,13 @@ void MainWindow::onTaskStatusChanged(int taskId, int state)
     ts.priority = targetTask.getPriority();
     ts.deadline = targetTask.getDeadline();
 
-    APIService::instance().updateTask(ts, [](bool, QJsonArray){});
+    APIService::instance().updateTask(ts, [](bool success, QJsonArray data){
+
+        if (!success || data.isEmpty()) { qDebug()<<"Can't update task in Back-end"; return;}
+
+        qDebug()<<"Task updated in Back-end!";
+
+    });
 
     refreshTaskList();
 }
@@ -212,8 +253,12 @@ void MainWindow::onDeleteTaskClicked(int taskId)
     taskManager.deleteTask(taskId);
     taskManager.saveToFile(dataFilePath);
 
-    APIService::instance().deleteTask(taskId, "task", [](bool, QJsonArray){
-        //xử lý phản hồi
+    APIService::instance().deleteTask(taskId, "soft", [](bool success, QJsonArray data){
+
+        if (!success || data.isEmpty()) { qDebug()<<"Can't delete task in Back-end"; return;}
+
+        qDebug()<<"Task Deleted in Back-end!";
+
     });
 
     refreshTaskList();
@@ -235,10 +280,26 @@ void MainWindow::onUndoTaskClicked()
         ts.priority = targetTask.getPriority();
         ts.deadline = targetTask.getDeadline();
 
-        APIService::instance().createNewTask(ts, [](bool success, QJsonObject data){
-            //Xử lý phản hồi
-            Q_UNUSED(success);
-            Q_UNUSED(data);
+        int tempId = ts.id;
+        APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject data){
+            if (!success || data.isEmpty()) { 
+                qDebug() << "Can't recreate task on undo"; 
+                return;
+            }
+
+            int realId = 0;
+            if (data.contains("task_id")) {
+                realId = data["task_id"].toInt();
+            } else if (data.contains("id")) {
+                realId = data["id"].toInt();
+            }
+
+            if (realId != 0) {
+                taskManager.updateTaskId(tempId, realId);
+                taskManager.saveToFile(dataFilePath);
+                refreshTaskList();
+                qDebug() << "Task undone! Real ID updated:" << realId;
+            }
         });
     }
 
@@ -252,7 +313,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         if (widget && widget->property("taskId").isValid()) {
             int taskId = widget->property("taskId").toInt();
             QList<Task> allTasks = taskManager.getAllTasks();
-            for (const Task &t : allTasks) {
+            for (const Task &t : std::as_const(allTasks)) {
                 if (t.getId() == taskId) {
                     TaskDialog dialog(this);
                     dialog.setTaskData(t);

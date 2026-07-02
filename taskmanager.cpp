@@ -11,6 +11,7 @@ TaskManager::TaskManager() {}
 void TaskManager::addTask(const QString &title, const QString &description, TaskStatus status, int priority, const QDateTime &deadline) {
     static int tempIdCounter = -1;
     int id = tempIdCounter--;
+
     tasks.append(Task(id, title, description, status, priority, deadline));
 }
 
@@ -221,7 +222,7 @@ bool TaskManager::loadFromFile(const QString &filePath) {
     tasks.clear();
     undoStack.clear();
     
-    for (const auto &val : jsonArray) {
+    for (const auto &val : std::as_const(jsonArray)) {
         QJsonObject taskObj = val.toObject();
         
         int id = 0;

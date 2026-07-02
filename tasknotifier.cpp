@@ -53,7 +53,7 @@ TaskNotifier::~TaskNotifier() {
 void TaskNotifier::sendNotification(const QString &title, const QString &message,
                              QSystemTrayIcon::MessageIcon iconType,
                              int durationMs) {
-    qDebug() << "[NOTIFICATION TRIGGERED] Cửa sổ thông báo xuất hiện -> Title:" << title << "| Message:" << message;
+    // qDebug() << "[NOTIFICATION TRIGGERED] Cửa sổ thông báo xuất hiện -> Title:" << title << "| Message:" << message;
 
     if (trayIcon && QSystemTrayIcon::supportsMessages()) {
         trayIcon->showMessage(title, message, iconType, durationMs);
@@ -63,7 +63,7 @@ void TaskNotifier::sendNotification(const QString &title, const QString &message
 void TaskNotifier::checkDeadlines(const QList<Task> &allTasks) {
     QDateTime now = QDateTime::currentDateTime();
 
-    qDebug() << "[TIMER] Đang quét kiểm tra các task ngầm lúc:" << now.toString("hh:mm:ss");
+    // qDebug() << "[TIMER] Đang quét kiểm tra các task ngầm lúc:" << now.toString("hh:mm:ss");
 
     for (const Task &task : allTasks) {
         if (task.getStatus() == TaskStatus::DONE) continue;

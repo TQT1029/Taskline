@@ -1,5 +1,4 @@
 #include "apiservice.h"
-#include "task.h" // Sửa lỗi HACK: include task.h thay vì task.cpp để tránh duplicate symbol
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -19,6 +18,9 @@ APIService::APIService(QObject *parent) : QObject(parent) {
 // Hàm phụ trợ tạo QNetworkRequest với các cấu hình chung (URL, Timeout, Headers)
 QNetworkRequest APIService::createRequest(const QString &endpoint) {
     QNetworkRequest request(QUrl("http://localhost:3000" + endpoint));
+
+    qDebug()<<QUrl("http://localhost:3000" + endpoint);
+
     request.setTransferTimeout(5000); // Tránh treo UI nếu server không phản hồi sau 5s
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", "Bearer PassworD"); // Token giả lập
@@ -44,7 +46,6 @@ void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
     connect(reply, &QNetworkReply::finished, [reply, callback]() {
         if (reply->error() != QNetworkReply::NoError) {
             callback(false, QJsonArray());
-            qDebug()<<"ket Noi Den server that bai";
             reply->deleteLater(); // Dọn dẹp bộ nhớ
             return;
         }
@@ -72,12 +73,6 @@ void APIService::createNewTask(TaskStats taskStats,
 
     QByteArray data = QJsonDocument(json).toJson();
 
-    qDebug() << "==========================";
-    qDebug() << "POST URL:" << request.url();
-    qDebug().noquote() << "JSON gui:";
-    qDebug().noquote() << data;
-    qDebug() << "==========================";
-
     QNetworkReply *reply = manager->post(request, data);
 
     handleSslErrors(reply);
@@ -85,15 +80,6 @@ void APIService::createNewTask(TaskStats taskStats,
     connect(reply, &QNetworkReply::finished, [reply, callback]() {
 
         QByteArray response = reply->readAll();
-
-        qDebug() << "HTTP Status:"
-                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-        qDebug() << "Network Error Code:" << reply->error();
-        qDebug() << "Network Error:" << reply->errorString();
-
-        qDebug().noquote() << "Response:";
-        qDebug().noquote() << response;
 
         if (reply->error() != QNetworkReply::NoError) {
 
@@ -143,7 +129,7 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
 /**
  * @brief Xóa một Task dựa trên ID
  */
-void APIService::deleteTask(int taskId,QString type, std::function<void(bool, QJsonArray)> callback) {
+void APIService::deleteTask(int taskId, QString type, std::function<void(bool, QJsonArray)> callback) {
     QNetworkRequest request = createRequest(QString("/tasks/%1?type=%2").arg(taskId).arg(type));
     QNetworkReply *reply = manager->deleteResource(request);
     handleSslErrors(reply);
