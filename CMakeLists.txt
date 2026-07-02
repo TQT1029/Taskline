@@ -23,6 +23,7 @@ set(PROJECT_SOURCES
         tasknotifier.cpp
         mainwindow_ui.cpp
         mainwindow_ui.h
+        taskdeadline.cpp
         ${TS_FILES}
 )
 
@@ -49,6 +50,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         tasknotifier.h
         tasknotifier.cpp
         taskdeadline.h
+        taskdeadline.cpp
         mainwindow_ui.h
         mainwindow_ui.cpp
     )
