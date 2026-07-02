@@ -19,6 +19,11 @@ set(PROJECT_SOURCES
         mainwindow.cpp
         mainwindow.h
         mainwindow.ui
+        tasksearch.cpp
+        tasknotifier.cpp
+        mainwindow_ui.cpp
+        mainwindow_ui.h
+        taskdeadline.cpp
         ${TS_FILES}
 )
 
@@ -42,8 +47,13 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         Res.qrc
         taskstatusbar.h
         tasksearch.h
+        tasksearch.cpp
         tasknotifier.h
-
+        tasknotifier.cpp
+        taskdeadline.h
+        taskdeadline.cpp
+        mainwindow_ui.h
+        mainwindow_ui.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET Taskline APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
