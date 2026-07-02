@@ -18,7 +18,7 @@ APIService::APIService(QObject *parent) : QObject(parent) {
 
 // Hàm phụ trợ tạo QNetworkRequest với các cấu hình chung (URL, Timeout, Headers)
 QNetworkRequest APIService::createRequest(const QString &endpoint) {
-    QNetworkRequest request(QUrl("https://localhost:3000" + endpoint));
+    QNetworkRequest request(QUrl("http://localhost:3000" + endpoint));
     request.setTransferTimeout(5000); // Tránh treo UI nếu server không phản hồi sau 5s
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", "Bearer PassworD"); // Token giả lập
@@ -44,6 +44,7 @@ void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
     connect(reply, &QNetworkReply::finished, [reply, callback]() {
         if (reply->error() != QNetworkReply::NoError) {
             callback(false, QJsonArray());
+            qDebug()<<"ket Noi Den server that bai";
             reply->deleteLater(); // Dọn dẹp bộ nhớ
             return;
         }
@@ -57,45 +58,69 @@ void APIService::getTasks(std::function<void(bool, QJsonArray)> callback) {
 /**
  * @brief Tạo mới một Task và gửi lên server
  */
-void APIService::createNewTask(TaskStats taskStats, std::function<void(bool, QJsonObject)> callback) {
-    QNetworkRequest request = createRequest("/tasks"); // POST endpoint
-    
+void APIService::createNewTask(TaskStats taskStats,
+                               std::function<void(bool, QJsonObject)> callback)
+{
+    QNetworkRequest request = createRequest("/tasks");
+
     QJsonObject json;
     json["title"] = taskStats.title;
     json["description"] = taskStats.description;
-    json["status"] = Task::statusToString(taskStats.status);
+    json["status"] = int(taskStats.status);
     json["priority"] = taskStats.priority;
     json["deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
 
     QByteArray data = QJsonDocument(json).toJson();
+
+    qDebug() << "==========================";
+    qDebug() << "POST URL:" << request.url();
+    qDebug().noquote() << "JSON gui:";
+    qDebug().noquote() << data;
+    qDebug() << "==========================";
+
     QNetworkReply *reply = manager->post(request, data);
+
     handleSslErrors(reply);
 
     connect(reply, &QNetworkReply::finished, [reply, callback]() {
+
+        QByteArray response = reply->readAll();
+
+        qDebug() << "HTTP Status:"
+                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+        qDebug() << "Network Error Code:" << reply->error();
+        qDebug() << "Network Error:" << reply->errorString();
+
+        qDebug().noquote() << "Response:";
+        qDebug().noquote() << response;
+
         if (reply->error() != QNetworkReply::NoError) {
+
             callback(false, QJsonObject());
+
             reply->deleteLater();
             return;
         }
-        
-        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+
+        QJsonDocument doc = QJsonDocument::fromJson(response);
+
         callback(true, doc.object());
+
         reply->deleteLater();
     });
 }
-
 /**
  * @brief Cập nhật thông tin của một Task
  */
 void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback) {
     // Thường update dùng ID trên URL, ví dụ: /tasks/123
-    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.id)); 
+    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskStats.task_id));
     
     QJsonObject json;
-    json["task_id"] = taskStats.id;
     json["title"] = taskStats.title;
     json["description"] = taskStats.description;
-    json["status"] = Task::statusToString(taskStats.status);
+    json["status"] = int(taskStats.status);
     json["priority"] = taskStats.priority;
     json["deadline"] = taskStats.deadline.toString("yyyy-MM-dd HH:mm:ss");
 
@@ -118,8 +143,8 @@ void APIService::updateTask(TaskStats taskStats, std::function<void(bool, QJsonA
 /**
  * @brief Xóa một Task dựa trên ID
  */
-void APIService::deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback) {
-    QNetworkRequest request = createRequest(QString("/tasks/%1").arg(taskId)); 
+void APIService::deleteTask(int taskId,QString type, std::function<void(bool, QJsonArray)> callback) {
+    QNetworkRequest request = createRequest(QString("/tasks/%1?type=%2").arg(taskId).arg(type));
     QNetworkReply *reply = manager->deleteResource(request);
     handleSslErrors(reply);
 

@@ -34,7 +34,7 @@ public:
     void updateTask(TaskStats taskStats, std::function<void(bool, QJsonArray)> callback);
     
     // Gửi yêu cầu xóa một Task
-    void deleteTask(int taskId, std::function<void(bool, QJsonArray)> callback);
+    void deleteTask(int taskId,QString type, std::function<void(bool, QJsonArray)> callback);
 
     // Lấy danh sách Task đã được sắp xếp từ server
     void sortTasks(std::function<void(bool, QJsonArray)> callback);

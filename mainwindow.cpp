@@ -7,12 +7,10 @@
 #include <QEvent>
 #include <algorithm>
 #include <QTextEdit>
+#include <iostream>
 #include <qjsonobject.h>
 #include "taskdialog.h"
 #include "ThemeUtils.h"
-#include "taskstatusbar.h"
-#include "tasksearch.h"
-#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -33,7 +31,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(undoButton, &QPushButton::clicked, this, &MainWindow::onUndoTaskClicked);
     connect(menuButton, &QToolButton::clicked, this, &MainWindow::onMenuButtonClicked);
 
-    refreshTaskList();
 }
 
 void MainWindow::setupUI()
@@ -72,15 +69,8 @@ void MainWindow::setupUI()
                                   ).arg(ThemeUtils::textMain()));
 
     topBarLayout->addWidget(menuButton); 
-    topBarLayout->addWidget(titleLabel);
-
+    topBarLayout->addWidget(titleLabel); 
     topBarLayout->addStretch();
-
-    taskSearch.setupInWidget(topBar);
-    topBarLayout->addWidget(taskSearch.searchButton);
-    topBarLayout->addWidget(taskSearch.searchEdit);
-
-    connect(&taskSearch, &TaskSearchHelper::searchRequested, this, &MainWindow::refreshTaskList);
 
     // 4. Khởi tạo nút + New
     newButton = new QPushButton("+ New", topBar);
@@ -125,37 +115,38 @@ void MainWindow::setupUI()
                                   "}"
                                   "QPushButton:hover { background-color: %4; }"
                                   ).arg(ThemeUtils::btnSecondary(), ThemeUtils::btnSecondaryText(), ThemeUtils::border(), ThemeUtils::btnSecondaryHover()));
-    taskTracker.setupInWidget(bottomBar);
-    bottomBarLayout->addWidget(taskTracker.statusLabel);
-    bottomBarLayout->addWidget(taskTracker.progressBar);
-
-    bottomBarLayout->addSpacing(15);
-
+    bottomBarLayout->addStretch();
     bottomBarLayout->addWidget(undoButton);
 
     // Ghép Layout
     mainLayout->addWidget(topBar, 0);      
     mainLayout->addWidget(scrollArea, 1);
     mainLayout->addWidget(bottomBar, 0);
-
-    notifier = new TaskNotifier(this);
-
-    QTimer *systemTimer = new QTimer(this);
-    connect(systemTimer, &QTimer::timeout, this, [this]() {
-        if (notifier) {
-            // Lấy danh sách task tươi mới nhất từ manager để ép quét
-            notifier->checkDeadlines(taskManager.getAllTasks());
-        }
-    });
-    systemTimer->start(10000); // Khởi động quét 10 giây/lần
 }
 
 void MainWindow::initData()
 {
-    dataFilePath = QDir::currentPath() + "/tasks.json";
-    taskManager.loadFromFile(dataFilePath);
-}
 
+
+    APIService::instance().getTasks(
+        [this](bool success, QJsonArray array)
+        {
+            qDebug() << "GET success =" << success;
+            qDebug() << "Size =" << array.size();
+
+            for (const auto &v : array)
+                qDebug() << v.toObject();
+
+            if (!success)
+                return;
+
+            taskManager.loadFromApi(array);
+
+            qDebug() << "TaskManager size =" << taskManager.getAllTasks().size();
+
+            refreshTaskList();
+        });
+}
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -164,52 +155,39 @@ MainWindow::~MainWindow()
 void MainWindow::addNewTask()
 {
     TaskDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted) {
-        taskManager.addTask(
-            dialog.getTitle(),
-            dialog.getDescription(),
-            dialog.getStatus(),
-            dialog.getPriority(),
-            dialog.getDeadline()
-            );
-        taskManager.saveToFile(dataFilePath);
 
-        // Lấy task vừa tạo (nằm cuối cùng trong danh sách)
-        QList<Task> all = taskManager.getAllTasks();
-        if (!all.isEmpty()) {
-            Task targetTask = all.last();
-            TaskStats ts;
-            ts.title = dialog.getTitle();
-            ts.description = dialog.getDescription();
-            ts.status = dialog.getStatus();
-            ts.priority = dialog.getPriority();
-            ts.deadline = dialog.getDeadline();
-            
-            // Cấp phát ID tạm cho task trước khi nhận ID từ server
-            int tempId = targetTask.getId();
-            
-            APIService::instance().createNewTask(ts, [this, tempId](bool success, QJsonObject obj){
-                if (success && !obj.isEmpty()) {
-                    int serverId = 0;
+    if (dialog.exec() != QDialog::Accepted)
+        return;
 
+    TaskStats ts;
+    ts.title = dialog.getTitle();
+    ts.description = dialog.getDescription();
+    ts.status = dialog.getStatus();
+    ts.priority = dialog.getPriority();
+    ts.deadline = dialog.getDeadline();
 
-                    if (obj.contains("id") || obj.contains("ID")) {
-                        QJsonValue idVal = obj.contains("id") ? obj["id"] : obj["ID"];
-                        serverId = idVal.isString() ? idVal.toString().toInt() : idVal.toInt();
+    APIService::instance().createNewTask(
+        ts,
+        [this](bool success, QJsonObject)
+        {
+            if (!success) {
+                qDebug() << "Tao task that bai";
+                return;
+            }
+
+            // Lấy lại toàn bộ danh sách từ server
+            APIService::instance().getTasks(
+                [this](bool success, QJsonArray array)
+                {
+                    if (!success) {
+                        qDebug() << "Lay danh sach task that bai";
+                        return;
                     }
-                    
-                    if (serverId != 0) {
-                        taskManager.updateTaskId(tempId, serverId);
-                        taskManager.saveToFile(dataFilePath);
-                        // Yêu cầu cập nhật lại giao diện ở thread chính
-                        QMetaObject::invokeMethod(this, "refreshTaskList", Qt::QueuedConnection);
-                    }
-                }
-            });
-        }
-        
-        refreshTaskList();
-    }
+
+                    taskManager.loadFromApi(array);
+                    refreshTaskList();
+                });
+        });
 }
 
 void MainWindow::refreshTaskList() {
@@ -217,18 +195,10 @@ void MainWindow::refreshTaskList() {
 
     QList<Task> finalTasks = getFilteredAndSortedTasks();
 
-    QString keyword = taskSearch.searchEdit ? taskSearch.searchEdit->text().trimmed() : "";
-
-    finalTasks = getFilteredAndSortedTasks();
 
     for (const Task &task : finalTasks) {
-        // CHỈ VẼ RA MÀN HÌNH NẾU: Ô search trống HOẶC Tiêu đề/Mô tả có chứa từ khóa
-        if (keyword.isEmpty() || task.getTitle().contains(keyword, Qt::CaseInsensitive)  //
-            || task.getDescription().contains(keyword, Qt::CaseInsensitive)) { //
-            renderTaskItem(task); //
-        }
+        renderTaskItem(task);
     }
-    taskTracker.updateStatistics(taskManager.getAllTasks());
 }
 
 void MainWindow::clearLayout(QLayout *layout) {
@@ -325,7 +295,7 @@ QLabel* MainWindow::createDescriptionLabel(const QString &desc, QWidget *parent)
         if (displayDesc.length() > maxChars) {
             displayDesc = displayDesc.left(maxChars).trimmed() + "...";
         }
-
+        
         // Chèn zero-width space (\u200B) để QLabel có thể tự do wrap/break-word
         // đối với các chuỗi dài liên tục không có dấu cách (như "awwwgydgyddd...")
         // mà vẫn giữ nguyên khả năng co giãn chiều cao (auto-scale height).
@@ -453,7 +423,7 @@ void MainWindow::onTaskStatusChanged(int state)
 
         // API Sync
         TaskStats ts;
-        ts.id = targetTask.getId();
+        ts.task_id = targetTask.getId();
         ts.title = targetTask.getTitle();
         ts.description = targetTask.getDescription();
         ts.status = targetTask.getStatus();
@@ -461,7 +431,6 @@ void MainWindow::onTaskStatusChanged(int state)
         ts.deadline = targetTask.getDeadline();
         APIService::instance().updateTask(ts, [](bool, QJsonArray){});
 
-        refreshTaskList();
     }
 }
 
@@ -470,11 +439,15 @@ void MainWindow::onDeleteTaskClicked()
     QToolButton *senderBtn = qobject_cast<QToolButton*>(sender());
     if (senderBtn) {
         int taskId = senderBtn->property("taskId").toInt();
-        taskManager.deleteTask(taskId);
-        taskManager.saveToFile(dataFilePath);
+        qDebug() << taskId;
+
 
         // API Sync
-        APIService::instance().deleteTask(taskId, [](bool, QJsonArray){});
+        APIService::instance().deleteTask(taskId, "soft", [](bool, QJsonArray){});
+
+        qDebug() << "Da Xoa";
+            taskManager.deleteTask(taskId);
+            taskManager.saveToFile(dataFilePath);
 
         refreshTaskList();
     }
@@ -552,7 +525,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 
                         // API Sync
                         TaskStats ts;
-                        ts.id = taskId;
+                        ts.task_id = taskId;
                         ts.title = dialog.getTitle();
                         ts.description = dialog.getDescription();
                         ts.status = dialog.getStatus();
@@ -583,25 +556,5 @@ void MainWindow::onMenuButtonClicked()
 
         // Làm mới lại danh sách hiển thị với bộ lọc mới
         refreshTaskList();
-    }
-}
-
-void MainWindow::closeEvent(QCloseEvent *event)
-{
-    // Nếu icon khay hệ thống (System Tray) đang hoạt động
-    if (notifier) {
-        this->hide(); // Ẩn cửa sổ chính đi thay vì tắt hẳn
-
-        // Gửi thông báo cho người dùng biết ứng dụng đã được thu nhỏ xuống khay hệ thống
-        notifier->sendNotification(
-            "Taskline vẫn đang chạy ngầm",
-            "Ứng dụng đã được thu nhỏ xuống khay hệ thống để tiếp tục theo dõi deadline.",
-            QSystemTrayIcon::Information,
-            2000
-            );
-
-        event->ignore(); // Chặn sự kiện tắt ứng dụng (không cho quit)
-    } else {
-        event->accept(); // Nếu không có notifier, cho phép tắt ứng dụng bình thường
     }
 }
